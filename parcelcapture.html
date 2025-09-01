@@ -34,6 +34,11 @@
 
     /* Small polishing */
     body { background: #f9fafb; color: #111827; }
+
+    /* Loader overlay */
+    #loaderOverlay {
+      backdrop-filter: blur(4px);
+    }
   </style>
 
   <!-- Set --vh to actual innerHeight so 100vh issues disappear on mobile -->
@@ -48,6 +53,17 @@
   </script>
 </head>
 <body class="vh-screen flex flex-col">
+  <!-- Loader overlay (visible until auth resolved) -->
+  <div id="loaderOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-white/95">
+    <div class="flex flex-col items-center gap-3">
+      <svg class="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+      </svg>
+      <div class="text-sm text-gray-700">Checking sign-in…</div>
+    </div>
+  </div>
+
   <!-- Navbar -->
   <header class="bg-white shadow-md px-4 py-3 flex justify-between items-center">
     <h1 class="text-base sm:text-lg font-bold">Parcel Capture</h1>
@@ -73,7 +89,7 @@
   </header>
 
   <!-- Main (sole scroll area) -->
-  <main class="kb-scroll flex-1 p-3 sm:p-4 max-w-md mx-auto w-full space-y-5">
+  <main id="mainContent" class="kb-scroll flex-1 p-3 sm:p-4 max-w-md mx-auto w-full space-y-5">
     <!-- Camera Section -->
     <section class="bg-white rounded-xl shadow p-3 sm:p-4 space-y-3">
       <h2 class="text-sm sm:text-base font-semibold">Capture Parcel</h2>
@@ -218,24 +234,83 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    // Auth check
+    // UI elements
+    const loaderOverlay = document.getElementById('loaderOverlay');
+    const userNameEl = document.getElementById('userName');
+    const userEmailEl = document.getElementById('userEmail');
+    const userPhotoEl = document.getElementById('userPhoto');
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userMenu = document.getElementById('userMenu');
+
+    // state for navigation blocking
+    let __backHandler = null;
+    window.__allowBack = false; // when true, back navigation is allowed
+    let isSignedIn = false;
+    let authPending = true; // true until onAuthStateChanged fires at least once
+
+    function disableBackNavigation() {
+      window.__allowBack = false;
+      if (__backHandler) return;
+      try { history.pushState({noBack:1}, "", location.href); } catch(e){}
+      try { history.pushState({noBack:2}, "", location.href); } catch(e){}
+      __backHandler = function (event) {
+        if (window.__allowBack) return;
+        try { history.pushState({noBack:1}, "", location.href); } catch(e){}
+      };
+      window.addEventListener('popstate', __backHandler);
+    }
+
+    function enableBackNavigation() {
+      window.__allowBack = true;
+      if (__backHandler) {
+        window.removeEventListener('popstate', __backHandler);
+        __backHandler = null;
+      }
+      try { history.replaceState(null, "", location.href); } catch(e) {}
+    }
+
+    // very early: prevent back during auth pending (e.g., returning from Google redirect)
+    disableBackNavigation();
+
+    // Auth check - single consolidated handler
     onAuthStateChanged(auth, (user) => {
+      // first auth resolution happened
+      authPending = false;
+
+      // hide loader overlay
+      if (loaderOverlay) loaderOverlay.style.display = 'none';
+
       if (!user) {
-        window.location.href = "login.html";
+        // no user -> enable back nav and redirect to login (use replace to avoid back to authenticated pages)
+        isSignedIn = false;
+        enableBackNavigation();
+        // If already on login page or index you might not want to redirect; we follow existing flow:
+        window.location.replace("login.html");
       } else {
-        document.getElementById("userName").textContent = user.displayName || "User";
-        document.getElementById("userEmail").textContent = user.email || "";
+        // user is signed in
+        isSignedIn = true;
+        // keep back navigation disabled
+        disableBackNavigation();
+
+        // update UI
+        userNameEl.textContent = user.displayName || "User";
+        userEmailEl.textContent = user.email || "";
         if (user.photoURL) {
-          const photo = document.getElementById("userPhoto");
-          photo.src = user.photoURL;
-          photo.classList.remove("hidden");
+          userPhotoEl.src = user.photoURL;
+          userPhotoEl.classList.remove("hidden");
+        } else {
+          userPhotoEl.classList.add("hidden");
         }
       }
+    }, (err) => {
+      // auth error - allow navigation and hide loader
+      console.error("Auth error:", err);
+      authPending = false;
+      if (loaderOverlay) loaderOverlay.style.display = 'none';
+      enableBackNavigation();
     });
 
     // Dropdown toggle
-    const userMenuBtn = document.getElementById("userMenuBtn");
-    const userMenu = document.getElementById("userMenu");
     userMenuBtn.addEventListener("click", () => {
       userMenu.classList.toggle("hidden");
     });
@@ -245,11 +320,17 @@
       }
     });
 
-   // Sign out
-document.getElementById("signOutBtn").addEventListener("click", async () => {
-  await signOut(auth);
-  window.location.replace("index.html"); // ✅ replaces history, no back navigation to login
-});
+    // Sign out: allow back then sign out and replace history to index
+    document.getElementById("signOutBtn").addEventListener("click", async () => {
+      try {
+        enableBackNavigation();
+        await signOut(auth);
+      } catch (err) {
+        console.error('Sign out error', err);
+      } finally {
+        window.location.replace("index.html"); // replace so previous authenticated pages are not reachable
+      }
+    });
 
     // Capture simulation
     const thumbs = document.getElementById('thumbs');
@@ -260,7 +341,7 @@ document.getElementById("signOutBtn").addEventListener("click", async () => {
       thumbs.appendChild(shot);
     });
 
-    // ✅ Enforce single checkbox selection per group (checkbox UI, radio behavior)
+    // Enforce single checkbox selection per group (checkbox UI, radio behavior)
     function enforceSingleSelection(groupClass) {
       const checkboxes = document.querySelectorAll(`.${groupClass}`);
       checkboxes.forEach(cb => {
@@ -309,18 +390,18 @@ document.getElementById("signOutBtn").addEventListener("click", async () => {
       document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
     });
 
-// ✅ Prevent back navigation while signed in
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    // Push a new state so back button has no effect
-    history.pushState(null, "", location.href);
-    window.addEventListener("popstate", () => {
-      history.pushState(null, "", location.href);
+    // Accessibility: when an input receives focus, ensure it's visible in the scroll container
+    // (keeps the page from jumping too aggressively; small delay lets keyboard open)
+    document.querySelectorAll("input, select, textarea").forEach(el => {
+      el.addEventListener("focus", () => {
+        // we only scroll if the element is not visible inside the main scroll area
+        setTimeout(() => {
+          if (typeof el.scrollIntoView === 'function') {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 300);
+      });
     });
-  }
-});
-
-
   </script>
 </body>
 </html>
