@@ -2,26 +2,57 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- viewport-fit=cover helps on iOS safe areas; maximum-scale=1 avoids accidental zoom -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <title>Parcel Capture</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { darkMode: 'class' }
   </script>
   <style>
-    html, body {
-      height: 100dvh; /* ✅ dynamic height to prevent keyboard overflow */
-      overflow-x: hidden;
+    :root { --vh: 1vh; } /* will be set to window.innerHeight * 0.01 via JS */
+    html, body { height: 100%; overflow-x: hidden; }
+
+    /* Use a stable, keyboard-safe viewport height */
+    .vh-screen {
+      min-height: 100svh;                /* fallback */
+      min-height: 100dvh;                /* modern mobile */
+      min-height: -webkit-fill-available;/* iOS Safari fallback */
+      min-height: calc(var(--vh) * 100); /* JS-corrected actual height */
     }
+
+    /* Make main the only scroll container and give room for keyboard */
+    .kb-scroll {
+      min-height: 0;              /* IMPORTANT: lets flex child shrink on mobile */
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scroll-padding-bottom: 28vh; /* space so focused inputs aren't under the keyboard */
+    }
+
+    /* Prevent iOS zoom-on-focus by keeping fields >=16px */
+    input, select, textarea { font-size: 16px; }
+
+    /* Small polishing */
+    body { background: #f9fafb; color: #111827; }
   </style>
+
+  <!-- Set --vh to actual innerHeight so 100vh issues disappear on mobile -->
+  <script>
+    const setVh = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+    setVh();
+    window.addEventListener('resize', setVh);
+    window.addEventListener('orientationchange', setVh);
+  </script>
 </head>
-<body class="bg-gray-50 text-gray-900 flex flex-col min-h-[100dvh]">
+<body class="vh-screen flex flex-col">
   <!-- Navbar -->
   <header class="bg-white shadow-md px-4 py-3 flex justify-between items-center">
     <h1 class="text-base sm:text-lg font-bold">Parcel Capture</h1>
     <div class="flex items-center gap-3">
       <a href="officer.html" class="hidden sm:inline px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs sm:text-sm hover:bg-blue-700">Officer Dashboard</a>
-      
       <!-- User Dropdown -->
       <div class="relative">
         <button id="userMenuBtn" class="flex items-center gap-2 focus:outline-none">
@@ -41,20 +72,20 @@
     </div>
   </header>
 
-  <!-- Main -->
-  <main class="flex-1 p-3 sm:p-4 max-w-md mx-auto w-full space-y-5 overflow-y-auto overscroll-contain">
+  <!-- Main (sole scroll area) -->
+  <main class="kb-scroll flex-1 p-3 sm:p-4 max-w-md mx-auto w-full space-y-5">
     <!-- Camera Section -->
     <section class="bg-white rounded-xl shadow p-3 sm:p-4 space-y-3">
       <h2 class="text-sm sm:text-base font-semibold">Capture Parcel</h2>
 
       <!-- Shot & Role -->
       <div class="flex flex-col sm:flex-row gap-2">
-        <select id="shotCount" class="w-full border rounded-md p-2 text-xs sm:text-sm">
+        <select id="shotCount" class="w-full border rounded-md p-2 text-base sm:text-sm">
           <option>1 Shot</option>
           <option>2 Shots</option>
           <option>3 Shots</option>
         </select>
-        <select id="role" class="w-full border rounded-md p-2 text-xs sm:text-sm">
+        <select id="role" class="w-full border rounded-md p-2 text-base sm:text-sm">
           <option>Marketer</option>
           <option>Office Assistant</option>
           <option>Management</option>
@@ -75,80 +106,82 @@
       <div id="thumbs" class="flex gap-2 overflow-x-auto pb-1"></div>
     </section>
 
-    <!-- Form Section -->
-    <section class="bg-white rounded-xl shadow p-4 sm:p-6 space-y-5">
-      <h2 class="text-base sm:text-lg font-semibold">Parcel Details</h2>
+    <!-- Parcel Details -->
+    <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-5">
+      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Parcel Details</h2>
 
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Name on Parcel</label>
           <input id="parcelName" type="text"
-            class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-sm sm:text-base px-3 py-2"
+            class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2"
             placeholder="Enter name">
         </div>
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
           <input id="parcelAddress" type="text"
-            class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-sm sm:text-base px-3 py-2"
+            class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2"
             placeholder="Enter address">
         </div>
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contact / Phone</label>
           <input id="parcelPhone" type="tel"
-            class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-sm sm:text-base px-3 py-2"
+            class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2"
             placeholder="Enter phone number">
         </div>
       </div>
+    </section>
 
-      <!-- Status 01 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Parcel Status 01</label>
-        <div id="status1" class="space-y-2">
-          <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-blue-50">
-            <input type="radio" name="status1" value="Rejected" class="text-blue-600 focus:ring-blue-500">
-            <span>Rejected</span>
-          </label>
-          <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-blue-50">
-            <input type="radio" name="status1" value="New School" class="text-blue-600 focus:ring-blue-500">
-            <span>New School / Late Registration</span>
-          </label>
-          <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-blue-50">
-            <input type="radio" name="status1" value="Shortages" class="text-blue-600 focus:ring-blue-500">
-            <span>Shortages</span>
-          </label>
-        </div>
+    <!-- Parcel Status 01 -->
+    <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-4">
+      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Parcel Status 01</h2>
+      <div id="status1" class="space-y-2">
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status1" value="Rejected" class="status1-checkbox w-4 h-4 text-blue-600 rounded">
+          <span class="text-sm">Rejected</span>
+        </label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status1" value="New School" class="status1-checkbox w-4 h-4 text-blue-600 rounded">
+          <span class="text-sm">New School / Late Registration</span>
+        </label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status1" value="Shortages" class="status1-checkbox w-4 h-4 text-blue-600 rounded">
+          <span class="text-sm">Shortages</span>
+        </label>
       </div>
+    </section>
 
-      <!-- Status 02 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Parcel Status 02</label>
-        <div id="status2" class="space-y-2">
-          <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-green-50">
-            <input type="radio" name="status2" value="Paid" class="text-green-600 focus:ring-green-500">
-            <span>Paid</span>
-          </label>
-          <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-green-50">
-            <input type="radio" name="status2" value="Part Payment" class="text-green-600 focus:ring-green-500">
-            <span>Part Payment</span>
-          </label>
-          <label class="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-green-50">
-            <input type="radio" name="status2" value="Not Paid" class="text-green-600 focus:ring-green-500">
-            <span>Not Paid</span>
-          </label>
-        </div>
+    <!-- Parcel Status 02 -->
+    <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-4">
+      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Parcel Status 02</h2>
+      <div id="status2" class="space-y-2">
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status2" value="Paid" class="status2-checkbox w-4 h-4 text-green-600 rounded">
+          <span class="text-sm">Paid</span>
+        </label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status2" value="Part Payment" class="status2-checkbox w-4 h-4 text-green-600 rounded">
+          <span class="text-sm">Part Payment</span>
+        </label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status2" value="Not Paid" class="status2-checkbox w-4 h-4 text-green-600 rounded">
+          <span class="text-sm">Not Paid</span>
+        </label>
       </div>
+    </section>
 
-      <!-- Capturer -->
+    <!-- Capturer -->
+    <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-5">
+      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Captured By</h2>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
         <input id="capturerName" type="text"
-          class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-sm sm:text-base px-3 py-2"
+          class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2"
           placeholder="Enter your name">
       </div>
 
-      <!-- Submit -->
       <div class="flex flex-col sm:flex-row gap-2">
         <button id="submitBtn"
           class="w-full sm:flex-1 px-6 py-2 bg-green-600 text-white rounded-lg text-sm sm:text-base font-semibold shadow hover:bg-green-700 transition">
@@ -158,7 +191,7 @@
     </section>
 
     <!-- History Section -->
-    <section class="bg-white rounded-xl shadow p-3 sm:p-4 flex flex-col h-64">
+    <section class="bg-white rounded-xl shadow p-3 sm:p-4 flex flex-col min-h-[10rem] max-h-[40vh]">
       <h2 class="text-sm sm:text-base font-semibold mb-2">History</h2>
       <div id="historyList" class="flex-1 overflow-y-auto space-y-3 text-xs sm:text-sm"></div>
     </section>
@@ -169,9 +202,7 @@
 
   <!-- Scripts -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
+    // ✅ Firebase setup
     const firebaseConfig = {
       apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
       authDomain: "employee-app-c781d.firebaseapp.com",
@@ -181,13 +212,16 @@
       appId: "1:232631444018:web:37b70fe37975abcc1b922b"
     };
 
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
     // Auth check
     onAuthStateChanged(auth, (user) => {
       if (!user) {
-        window.location.href = "index.html";
+        window.location.href = "login.html";
       } else {
         document.getElementById("userName").textContent = user.displayName || "User";
         document.getElementById("userEmail").textContent = user.email || "";
@@ -214,7 +248,7 @@
     // Sign out
     document.getElementById("signOutBtn").addEventListener("click", async () => {
       await signOut(auth);
-      window.location.href = "index.html"; // ✅ redirect here
+      window.location.href = "index.html";
     });
 
     // Capture simulation
@@ -226,25 +260,35 @@
       thumbs.appendChild(shot);
     });
 
+    // ✅ Enforce single checkbox selection per group (checkbox UI, radio behavior)
+    function enforceSingleSelection(groupClass) {
+      const checkboxes = document.querySelectorAll(`.${groupClass}`);
+      checkboxes.forEach(cb => {
+        cb.addEventListener("change", () => {
+          if (cb.checked) checkboxes.forEach(other => { if (other !== cb) other.checked = false; });
+        });
+      });
+    }
+    enforceSingleSelection("status1-checkbox");
+    enforceSingleSelection("status2-checkbox");
+
     // Submit simulation
     const historyList = document.getElementById('historyList');
     document.getElementById('submitBtn').addEventListener('click', () => {
-      const name = document.getElementById('parcelName').value;
-      const address = document.getElementById('parcelAddress').value;
-      const phone = document.getElementById('parcelPhone').value;
-      const capturer = document.getElementById('capturerName').value;
+      const name = document.getElementById('parcelName').value.trim();
+      const address = document.getElementById('parcelAddress').value.trim();
+      const phone = document.getElementById('parcelPhone').value.trim();
+      const capturer = document.getElementById('capturerName').value.trim();
 
-      if (!name || !address || !phone || !capturer) {
+      if(!name || !address || !phone || !capturer) {
         alert('Please fill all fields!');
         return;
       }
 
-      let status1 = document.querySelector('input[name="status1"]:checked');
-      let status2 = document.querySelector('input[name="status2"]:checked');
-      status1 = status1 ? status1.value : '';
-      status2 = status2 ? status2.value : '';
+      const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
+      const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
 
-      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
       const bubble = document.createElement('div');
       bubble.className = 'bg-blue-100 rounded-lg p-3 max-w-[85%] break-words';
@@ -262,16 +306,7 @@
       document.getElementById('parcelPhone').value = '';
       document.getElementById('capturerName').value = '';
       thumbs.innerHTML = '';
-      document.querySelectorAll('input[name="status1"], input[name="status2"]').forEach(cb => cb.checked = false);
-    });
-
-    // ✅ Prevent keyboard covering inputs
-    document.querySelectorAll("input, select, textarea").forEach(el => {
-      el.addEventListener("focus", () => {
-        setTimeout(() => {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 300);
-      });
+      document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
     });
   </script>
 </body>
