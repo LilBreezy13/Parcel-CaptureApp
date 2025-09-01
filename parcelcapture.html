@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <title>Parcel Capture</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { darkMode: 'class' }
-  </script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
   <style>
     :root { --vh: 1vh; }
     html, body { height: 100%; overflow-x: hidden; }
@@ -27,14 +25,6 @@
   </script>
 </head>
 <body class="vh-screen flex flex-col">
-
-  <!-- Loading Overlay -->
-  <div id="loadingOverlay" class="fixed inset-0 bg-white flex items-center justify-center z-50">
-    <div class="flex flex-col items-center gap-3">
-      <div class="animate-spin h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-      <p class="text-gray-600 text-sm">Loading...</p>
-    </div>
-  </div>
 
   <!-- Navbar -->
   <header class="bg-white shadow-md px-4 py-3 flex justify-between items-center">
@@ -60,15 +50,20 @@
 
   <!-- Main -->
   <main class="kb-scroll flex-1 p-3 sm:p-4 max-w-md mx-auto w-full space-y-5">
+
     <!-- Camera Section -->
     <section class="bg-white rounded-xl shadow p-3 sm:p-4 space-y-3">
       <h2 class="text-sm sm:text-base font-semibold">Capture Parcel</h2>
       <div class="flex flex-col sm:flex-row gap-2">
         <select id="shotCount" class="w-full border rounded-md p-2 text-base sm:text-sm">
-          <option>1 Shot</option><option>2 Shots</option><option>3 Shots</option>
+          <option>1 Shot</option>
+          <option>2 Shots</option>
+          <option>3 Shots</option>
         </select>
         <select id="role" class="w-full border rounded-md p-2 text-base sm:text-sm">
-          <option>Marketer</option><option>Office Assistant</option><option>Management</option>
+          <option>Marketer</option>
+          <option>Office Assistant</option>
+          <option>Management</option>
         </select>
       </div>
       <div class="bg-black rounded-lg flex items-center justify-center h-48 sm:h-64 w-full">
@@ -103,9 +98,15 @@
     <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-4">
       <h2 class="text-base sm:text-lg font-semibold text-blue-800">Parcel Status 01</h2>
       <div id="status1" class="space-y-2">
-        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer"><input type="checkbox" name="status1" value="Rejected" class="status1-checkbox w-4 h-4 text-blue-600 rounded"><span class="text-sm">Rejected</span></label>
-        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer"><input type="checkbox" name="status1" value="New School" class="status1-checkbox w-4 h-4 text-blue-600 rounded"><span class="text-sm">New School / Late Registration</span></label>
-        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer"><input type="checkbox" name="status1" value="Shortages" class="status1-checkbox w-4 h-4 text-blue-600 rounded"><span class="text-sm">Shortages</span></label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status1" value="Rejected" class="status1-checkbox w-4 h-4 text-blue-600 rounded"><span class="text-sm">Rejected</span>
+        </label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status1" value="New School" class="status1-checkbox w-4 h-4 text-blue-600 rounded"><span class="text-sm">New School / Late Registration</span>
+        </label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status1" value="Shortages" class="status1-checkbox w-4 h-4 text-blue-600 rounded"><span class="text-sm">Shortages</span>
+        </label>
       </div>
     </section>
 
@@ -113,9 +114,15 @@
     <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-4">
       <h2 class="text-base sm:text-lg font-semibold text-blue-800">Parcel Status 02</h2>
       <div id="status2" class="space-y-2">
-        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer"><input type="checkbox" name="status2" value="Paid" class="status2-checkbox w-4 h-4 text-green-600 rounded"><span class="text-sm">Paid</span></label>
-        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer"><input type="checkbox" name="status2" value="Part Payment" class="status2-checkbox w-4 h-4 text-green-600 rounded"><span class="text-sm">Part Payment</span></label>
-        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer"><input type="checkbox" name="status2" value="Not Paid" class="status2-checkbox w-4 h-4 text-green-600 rounded"><span class="text-sm">Not Paid</span></label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status2" value="Paid" class="status2-checkbox w-4 h-4 text-green-600 rounded"><span class="text-sm">Paid</span>
+        </label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status2" value="Part Payment" class="status2-checkbox w-4 h-4 text-green-600 rounded"><span class="text-sm">Part Payment</span>
+        </label>
+        <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
+          <input type="checkbox" name="status2" value="Not Paid" class="status2-checkbox w-4 h-4 text-green-600 rounded"><span class="text-sm">Not Paid</span>
+        </label>
       </div>
     </section>
 
@@ -131,7 +138,7 @@
       </div>
     </section>
 
-    <!-- History -->
+    <!-- History Section -->
     <section class="bg-white rounded-xl shadow p-3 sm:p-4 flex flex-col min-h-[10rem] max-h-[40vh]">
       <h2 class="text-sm sm:text-base font-semibold mb-2">History</h2>
       <div id="historyList" class="flex-1 overflow-y-auto space-y-3 text-xs sm:text-sm"></div>
@@ -142,6 +149,10 @@
 
   <!-- Scripts -->
   <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
       authDomain: "employee-app-c781d.firebaseapp.com",
@@ -151,40 +162,19 @@
       appId: "1:232631444018:web:37b70fe37975abcc1b922b"
     };
 
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-
-    // 🔒 Back navigation lock
-    function lockBackNavigation() {
-      history.pushState({ page: "parcel" }, "", location.href);
-      window.addEventListener("popstate", handleBack, { passive: false });
-    }
-    function handleBack() {
-      history.pushState({ page: "parcel" }, "", location.href);
-    }
-    function unlockBackNavigation() {
-      window.removeEventListener("popstate", handleBack);
-    }
+    const db = getFirestore(app);
 
     // Auth check
     onAuthStateChanged(auth, (user) => {
-      const loader = document.getElementById("loadingOverlay");
-      if (user) {
-        lockBackNavigation();
-        if (loader) loader.style.display = "none";
+      if (!user) window.location.replace("login.html");
+      else {
         document.getElementById("userName").textContent = user.displayName || "User";
         document.getElementById("userEmail").textContent = user.email || "";
-        if (user.photoURL) {
-          const photo = document.getElementById("userPhoto");
-          photo.src = user.photoURL;
-          photo.classList.remove("hidden");
-        }
-      } else {
-        unlockBackNavigation();
-        window.location.href = "login.html";
+        if(user.photoURL){const photo=document.getElementById("userPhoto");photo.src=user.photoURL;photo.classList.remove("hidden");}
+        history.pushState(null, "", location.href);
+        window.addEventListener("popstate", () => { history.pushState(null, "", location.href); });
       }
     });
 
@@ -197,7 +187,6 @@
     // Sign out
     document.getElementById("signOutBtn").addEventListener("click", async () => {
       await signOut(auth);
-      unlockBackNavigation();
       window.location.replace("index.html");
     });
 
@@ -210,39 +199,51 @@
       thumbs.appendChild(shot);
     });
 
-    // Single checkbox per group
-    function enforceSingleSelection(groupClass) {
-      const checkboxes = document.querySelectorAll(`.${groupClass}`);
-      checkboxes.forEach(cb => {
-        cb.addEventListener("change", () => {
-          if (cb.checked) checkboxes.forEach(other => { if (other !== cb) other.checked = false; });
+    // Enforce single checkbox selection
+    function enforceSingleSelection(groupClass){
+      document.querySelectorAll(`.${groupClass}`).forEach(cb=>{
+        cb.addEventListener("change", ()=>{
+          if(cb.checked) document.querySelectorAll(`.${groupClass}`).forEach(other => { if(other!==cb) other.checked=false; });
         });
       });
     }
     enforceSingleSelection("status1-checkbox");
     enforceSingleSelection("status2-checkbox");
 
-    // Submit simulation
-    const historyList = document.getElementById('historyList');
-    document.getElementById('submitBtn').addEventListener('click', () => {
+    // Submit parcel (UI + Firestore)
+    document.getElementById('submitBtn').addEventListener('click', async () => {
       const name = document.getElementById('parcelName').value.trim();
       const address = document.getElementById('parcelAddress').value.trim();
       const phone = document.getElementById('parcelPhone').value.trim();
       const capturer = document.getElementById('capturerName').value.trim();
-      if(!name || !address || !phone || !capturer) { alert('Please fill all fields!'); return; }
       const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
       const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
-      const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+      if(!name || !address || !phone || !capturer){ alert('Please fill all fields!'); return; }
+
+      // Save to Firestore
+      try{
+        await addDoc(collection(db,"parcels"),{
+          name, address, phone, capturer, status1, status2, timestamp: serverTimestamp()
+        });
+        console.log("Parcel saved to Firestore!");
+      }catch(err){ console.error("Error saving to Firestore:",err); }
+
+      // Update UI history
+      const historyList = document.getElementById('historyList');
+      const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
       const bubble = document.createElement('div');
       bubble.className = 'bg-blue-100 rounded-lg p-3 max-w-[85%] break-words';
       bubble.innerHTML = `<p><b>${name}</b></p><p class='text-xs text-gray-600'>${address}</p><p class='text-xs mt-1'>${status1} • ${status2}</p><span class='text-xs text-gray-400'>${time}</span>`;
       historyList.appendChild(bubble);
-      document.getElementById('parcelName').value = '';
-      document.getElementById('parcelAddress').value = '';
-      document.getElementById('parcelPhone').value = '';
-      document.getElementById('capturerName').value = '';
-      thumbs.innerHTML = '';
-      document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
+
+      // Reset
+      document.getElementById('parcelName').value='';
+      document.getElementById('parcelAddress').value='';
+      document.getElementById('parcelPhone').value='';
+      document.getElementById('capturerName').value='';
+      thumbs.innerHTML='';
+      document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb=>cb.checked=false);
     });
   </script>
 </body>
