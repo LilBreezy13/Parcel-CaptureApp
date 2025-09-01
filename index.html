@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login - Parcel App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white min-h-screen flex items-center justify-center px-4">
+
+  <!-- Login Container -->
+  <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-8 sm:p-10">
+
+    <!-- Logo -->
+    <div class="flex justify-center mb-6">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Parcel_icon.svg/120px-Parcel_icon.svg.png" 
+           class="w-14 h-14 sm:w-16 sm:h-16" alt="Parcel Logo">
+    </div>
+
+    <!-- Heading -->
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 text-center mb-2">Welcome Back</h1>
+    <p class="text-gray-600 text-center text-sm sm:text-base mb-8">
+      Sign in to continue with Parcel App
+    </p>
+
+    <!-- Google Login Button -->
+    <button id="googleLogin" 
+      class="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-800 font-medium px-4 sm:px-5 py-3 rounded-lg sm:rounded-xl shadow hover:shadow-md hover:bg-gray-50 transition duration-300">
+      <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google">
+      <span class="text-sm sm:text-base">Continue with Google</span>
+    </button>
+
+    <!-- Footer -->
+    <p class="text-xs text-gray-400 mt-6 text-center leading-relaxed">
+      By signing in, you agree to our 
+      <a href="#" class="text-blue-600 hover:underline">Terms</a> & 
+      <a href="#" class="text-blue-600 hover:underline">Privacy Policy</a>
+    </p>
+  </div>
+
+  <script type="module">
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
+      authDomain: "employee-app-c781d.firebaseapp.com",
+      projectId: "employee-app-c781d",
+      storageBucket: "employee-app-c781d.appspot.com",
+      messagingSenderId: "232631444018",
+      appId: "1:232631444018:web:37b70fe37975abcc1b922b"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        console.log("Signed in already:", user.displayName || user.email);
+      }
+    });
+
+    document.getElementById('googleLogin').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        await signInWithPopup(auth, provider);
+        window.location.href = 'parcelcapture.html';
+      } catch (err) {
+        console.error(err);
+        alert('Login failed: ' + (err.message || err));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+
+</body>
+</html>
