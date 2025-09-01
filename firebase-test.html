@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Firebase Test</title>
+  <script type="module">
+    // paste your firebaseConfig here if different
+    const firebaseConfig = {
+      apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
+      authDomain: "employee-app-c781d.firebaseapp.com",
+      projectId: "employee-app-c781d",
+      storageBucket: "employee-app-c781d.appspot.com",
+      messagingSenderId: "232631444018",
+      appId: "1:232631444018:web:37b70fe37975abcc1b922b"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // optionally sign in anonymously for test (or sign in with your account in another tab)
+    async function anonSignIn() {
+      try {
+        await signInAnonymously(auth);
+        console.log('Signed in anonymously');
+      } catch(e) {
+        console.error('Anon sign-in error', e);
+      }
+    }
+
+    window.anonSignIn = anonSignIn;
+
+    window.writeTest = async () => {
+      try {
+        // try to create a test parcel doc
+        const docRef = await addDoc(collection(db, 'parcels'), {
+          schoolName: 'TEST SCHOOL',
+          address: 'Test address',
+          phone: '000-000-000',
+          capturedBy: 'Test user',
+          parcelStatus01: 'New School',
+          parcelStatus02: 'Paid',
+          images: [],
+          timestamp: serverTimestamp()
+        });
+        alert('Created doc: ' + docRef.id);
+      } catch (err) {
+        console.error('Write failed', err);
+        alert('Write failed: ' + (err.message || err));
+      }
+    };
+  </script>
+</head>
+<body style="font-family:sans-serif;padding:20px">
+  <h2>Firebase quick test</h2>
+  <p>1. Click <b>Sign in anonymous</b> (or sign-in with your real account in another tab)</p>
+  <button onclick="anonSignIn()">Sign in anonymous (test)</button>
+  <p>2. Click <b>Write test doc</b> — it will try to create a document in <code>/parcels</code>.</p>
+  <button onclick="writeTest()">Write test doc</button>
+  <p>Open devtools console to see errors if any.</p>
+</body>
+</html>
