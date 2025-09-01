@@ -245,11 +245,11 @@
       }
     });
 
-    // Sign out
-    document.getElementById("signOutBtn").addEventListener("click", async () => {
-      await signOut(auth);
-      window.location.href = "index.html";
-    });
+   // Sign out
+document.getElementById("signOutBtn").addEventListener("click", async () => {
+  await signOut(auth);
+  window.location.replace("index.html"); // ✅ replaces history, no back navigation to login
+});
 
     // Capture simulation
     const thumbs = document.getElementById('thumbs');
@@ -308,6 +308,19 @@
       thumbs.innerHTML = '';
       document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
     });
+
+// ✅ Prevent back navigation while signed in
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // Push a new state so back button has no effect
+    history.pushState(null, "", location.href);
+    window.addEventListener("popstate", () => {
+      history.pushState(null, "", location.href);
+    });
+  }
+});
+
+
   </script>
 </body>
 </html>
