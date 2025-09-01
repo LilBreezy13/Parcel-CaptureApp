@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <!-- viewport-fit=cover helps on iOS safe areas; maximum-scale=1 avoids accidental zoom -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <title>Parcel Capture</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -10,38 +9,39 @@
     tailwind.config = { darkMode: 'class' }
   </script>
   <style>
-    :root { --vh: 1vh; } /* will be set to window.innerHeight * 0.01 via JS */
+    :root { --vh: 1vh; }
     html, body { height: 100%; overflow-x: hidden; }
 
-    /* Use a stable, keyboard-safe viewport height */
     .vh-screen {
-      min-height: 100svh;                /* fallback */
-      min-height: 100dvh;                /* modern mobile */
-      min-height: -webkit-fill-available;/* iOS Safari fallback */
-      min-height: calc(var(--vh) * 100); /* JS-corrected actual height */
+      min-height: 100svh;
+      min-height: 100dvh;
+      min-height: -webkit-fill-available;
+      min-height: calc(var(--vh) * 100);
     }
 
-    /* Make main the only scroll container and give room for keyboard */
     .kb-scroll {
-      min-height: 0;              /* IMPORTANT: lets flex child shrink on mobile */
+      min-height: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
-      scroll-padding-bottom: 28vh; /* space so focused inputs aren't under the keyboard */
+      scroll-padding-bottom: 28vh;
     }
 
-    /* Prevent iOS zoom-on-focus by keeping fields >=16px */
     input, select, textarea { font-size: 16px; }
 
-    /* Small polishing */
     body { background: #f9fafb; color: #111827; }
 
-    /* Loader overlay */
-    #loaderOverlay {
-      backdrop-filter: blur(4px);
+    /* Loading overlay */
+    #loadingOverlay {
+      position: fixed;
+      inset: 0;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
     }
   </style>
 
-  <!-- Set --vh to actual innerHeight so 100vh issues disappear on mobile -->
   <script>
     const setVh = () => {
       const vh = window.innerHeight * 0.01;
@@ -53,14 +53,11 @@
   </script>
 </head>
 <body class="vh-screen flex flex-col">
-  <!-- Loader overlay (visible until auth resolved) -->
-  <div id="loaderOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-white/95">
-    <div class="flex flex-col items-center gap-3">
-      <svg class="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-      </svg>
-      <div class="text-sm text-gray-700">Checking sign-in…</div>
+  <!-- ✅ Loading overlay -->
+  <div id="loadingOverlay">
+    <div class="flex flex-col items-center space-y-3">
+      <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600"></div>
+      <p class="text-gray-600 text-sm">Loading...</p>
     </div>
   </div>
 
@@ -78,7 +75,6 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
           </svg>
         </button>
-        <!-- Dropdown menu -->
         <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg py-2 text-sm z-50">
           <p id="userEmail" class="px-4 py-2 text-gray-500 truncate"></p>
           <hr>
@@ -88,13 +84,12 @@
     </div>
   </header>
 
-  <!-- Main (sole scroll area) -->
-  <main id="mainContent" class="kb-scroll flex-1 p-3 sm:p-4 max-w-md mx-auto w-full space-y-5">
+  <!-- Main -->
+  <main class="kb-scroll flex-1 p-3 sm:p-4 max-w-md mx-auto w-full space-y-5">
     <!-- Camera Section -->
     <section class="bg-white rounded-xl shadow p-3 sm:p-4 space-y-3">
       <h2 class="text-sm sm:text-base font-semibold">Capture Parcel</h2>
 
-      <!-- Shot & Role -->
       <div class="flex flex-col sm:flex-row gap-2">
         <select id="shotCount" class="w-full border rounded-md p-2 text-base sm:text-sm">
           <option>1 Shot</option>
@@ -108,17 +103,14 @@
         </select>
       </div>
 
-      <!-- Camera Preview -->
       <div class="bg-black rounded-lg flex items-center justify-center h-48 sm:h-64 w-full">
         <span class="text-gray-400 text-xs sm:text-sm">Camera Preview</span>
       </div>
 
-      <!-- Capture Button -->
       <div class="flex justify-center">
         <button id="captureBtn" type="button" class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700">📸</button>
       </div>
 
-      <!-- Thumbnails -->
       <div id="thumbs" class="flex gap-2 overflow-x-auto pb-1"></div>
     </section>
 
@@ -133,14 +125,12 @@
             class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2"
             placeholder="Enter name">
         </div>
-
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
           <input id="parcelAddress" type="text"
             class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2"
             placeholder="Enter address">
         </div>
-
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contact / Phone</label>
           <input id="parcelPhone" type="tel"
@@ -197,7 +187,6 @@
           class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2"
           placeholder="Enter your name">
       </div>
-
       <div class="flex flex-col sm:flex-row gap-2">
         <button id="submitBtn"
           class="w-full sm:flex-1 px-6 py-2 bg-green-600 text-white rounded-lg text-sm sm:text-base font-semibold shadow hover:bg-green-700 transition">
@@ -206,7 +195,7 @@
       </div>
     </section>
 
-    <!-- History Section -->
+    <!-- History -->
     <section class="bg-white rounded-xl shadow p-3 sm:p-4 flex flex-col min-h-[10rem] max-h-[40vh]">
       <h2 class="text-sm sm:text-base font-semibold mb-2">History</h2>
       <div id="historyList" class="flex-1 overflow-y-auto space-y-3 text-xs sm:text-sm"></div>
@@ -218,7 +207,7 @@
 
   <!-- Scripts -->
   <script type="module">
-    // ✅ Firebase setup
+    // Firebase setup
     const firebaseConfig = {
       apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
       authDomain: "employee-app-c781d.firebaseapp.com",
@@ -234,83 +223,40 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    // UI elements
-    const loaderOverlay = document.getElementById('loaderOverlay');
-    const userNameEl = document.getElementById('userName');
-    const userEmailEl = document.getElementById('userEmail');
-    const userPhotoEl = document.getElementById('userPhoto');
-    const userMenuBtn = document.getElementById('userMenuBtn');
-    const userMenu = document.getElementById('userMenu');
-
-    // state for navigation blocking
-    let __backHandler = null;
-    window.__allowBack = false; // when true, back navigation is allowed
-    let isSignedIn = false;
-    let authPending = true; // true until onAuthStateChanged fires at least once
-
-    function disableBackNavigation() {
-      window.__allowBack = false;
-      if (__backHandler) return;
-      try { history.pushState({noBack:1}, "", location.href); } catch(e){}
-      try { history.pushState({noBack:2}, "", location.href); } catch(e){}
-      __backHandler = function (event) {
-        if (window.__allowBack) return;
-        try { history.pushState({noBack:1}, "", location.href); } catch(e){}
-      };
-      window.addEventListener('popstate', __backHandler);
+    // ✅ Back navigation lock
+    function lockBackNavigation() {
+      history.pushState(null, "", location.href);
+      window.addEventListener("popstate", handleBack);
+    }
+    function handleBack() {
+      history.pushState(null, "", location.href);
+    }
+    function unlockBackNavigation() {
+      window.removeEventListener("popstate", handleBack);
     }
 
-    function enableBackNavigation() {
-      window.__allowBack = true;
-      if (__backHandler) {
-        window.removeEventListener('popstate', __backHandler);
-        __backHandler = null;
-      }
-      try { history.replaceState(null, "", location.href); } catch(e) {}
-    }
-
-    // very early: prevent back during auth pending (e.g., returning from Google redirect)
-    disableBackNavigation();
-
-    // Auth check - single consolidated handler
+    // Auth check
     onAuthStateChanged(auth, (user) => {
-      // first auth resolution happened
-      authPending = false;
-
-      // hide loader overlay
-      if (loaderOverlay) loaderOverlay.style.display = 'none';
-
-      if (!user) {
-        // no user -> enable back nav and redirect to login (use replace to avoid back to authenticated pages)
-        isSignedIn = false;
-        enableBackNavigation();
-        // If already on login page or index you might not want to redirect; we follow existing flow:
-        window.location.replace("login.html");
-      } else {
-        // user is signed in
-        isSignedIn = true;
-        // keep back navigation disabled
-        disableBackNavigation();
-
-        // update UI
-        userNameEl.textContent = user.displayName || "User";
-        userEmailEl.textContent = user.email || "";
+      const loader = document.getElementById("loadingOverlay");
+      if (user) {
+        lockBackNavigation();
+        loader.style.display = "none"; // hide loader
+        document.getElementById("userName").textContent = user.displayName || "User";
+        document.getElementById("userEmail").textContent = user.email || "";
         if (user.photoURL) {
-          userPhotoEl.src = user.photoURL;
-          userPhotoEl.classList.remove("hidden");
-        } else {
-          userPhotoEl.classList.add("hidden");
+          const photo = document.getElementById("userPhoto");
+          photo.src = user.photoURL;
+          photo.classList.remove("hidden");
         }
+      } else {
+        unlockBackNavigation();
+        window.location.href = "login.html";
       }
-    }, (err) => {
-      // auth error - allow navigation and hide loader
-      console.error("Auth error:", err);
-      authPending = false;
-      if (loaderOverlay) loaderOverlay.style.display = 'none';
-      enableBackNavigation();
     });
 
     // Dropdown toggle
+    const userMenuBtn = document.getElementById("userMenuBtn");
+    const userMenu = document.getElementById("userMenu");
     userMenuBtn.addEventListener("click", () => {
       userMenu.classList.toggle("hidden");
     });
@@ -320,16 +266,11 @@
       }
     });
 
-    // Sign out: allow back then sign out and replace history to index
+    // ✅ Sign out
     document.getElementById("signOutBtn").addEventListener("click", async () => {
-      try {
-        enableBackNavigation();
-        await signOut(auth);
-      } catch (err) {
-        console.error('Sign out error', err);
-      } finally {
-        window.location.replace("index.html"); // replace so previous authenticated pages are not reachable
-      }
+      await signOut(auth);
+      unlockBackNavigation();
+      window.location.replace("index.html");
     });
 
     // Capture simulation
@@ -341,7 +282,7 @@
       thumbs.appendChild(shot);
     });
 
-    // Enforce single checkbox selection per group (checkbox UI, radio behavior)
+    // ✅ Enforce single checkbox selection
     function enforceSingleSelection(groupClass) {
       const checkboxes = document.querySelectorAll(`.${groupClass}`);
       checkboxes.forEach(cb => {
@@ -368,7 +309,6 @@
 
       const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
       const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
-
       const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
       const bubble = document.createElement('div');
@@ -381,26 +321,12 @@
       `;
       historyList.appendChild(bubble);
 
-      // reset
       document.getElementById('parcelName').value = '';
       document.getElementById('parcelAddress').value = '';
       document.getElementById('parcelPhone').value = '';
       document.getElementById('capturerName').value = '';
       thumbs.innerHTML = '';
       document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
-    });
-
-    // Accessibility: when an input receives focus, ensure it's visible in the scroll container
-    // (keeps the page from jumping too aggressively; small delay lets keyboard open)
-    document.querySelectorAll("input, select, textarea").forEach(el => {
-      el.addEventListener("focus", () => {
-        // we only scroll if the element is not visible inside the main scroll area
-        setTimeout(() => {
-          if (typeof el.scrollIntoView === 'function') {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }, 300);
-      });
     });
   </script>
 </body>
