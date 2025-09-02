@@ -55,24 +55,35 @@
     <section class="bg-white rounded-xl shadow p-3 sm:p-4 space-y-3">
       <h2 class="text-sm sm:text-base font-semibold">Capture Parcel</h2>
       <div class="flex flex-col sm:flex-row gap-2">
+        <!-- value attributes set so we can parse numbers reliably -->
         <select id="shotCount" class="w-full border rounded-md p-2 text-base sm:text-sm">
-          <option>1 Shot</option>
-          <option>2 Shots</option>
-          <option>3 Shots</option>
+          <option value="1">1 Shot</option>
+          <option value="2">2 Shots</option>
+          <option value="3">3 Shots</option>
         </select>
         <select id="role" class="w-full border rounded-md p-2 text-base sm:text-sm">
-          <option>Marketer</option>
-          <option>Office Assistant</option>
-          <option>Management</option>
+          <option value="Marketer">Marketer</option>
+          <option value="Office Assistant">Office Assistant</option>
+          <option value="Management">Management</option>
         </select>
       </div>
-      <div class="bg-black rounded-lg flex items-center justify-center h-48 sm:h-64 w-full">
-        <span class="text-gray-400 text-xs sm:text-sm">Camera Preview</span>
+
+      <!-- Live camera preview -->
+      <div class="relative w-full">
+        <video id="camera" class="w-full rounded-lg bg-black h-48 sm:h-64 object-cover" autoplay playsinline muted></video>
+        <canvas id="snapshotCanvas" class="hidden"></canvas>
+        <div class="absolute top-2 right-2 flex gap-2">
+          <button id="switchCam" type="button" class="px-2 py-1 text-xs sm:text-sm bg-white/80 backdrop-blur rounded-md shadow hover:bg-white">🔄</button>
+          <label for="filePicker" class="px-2 py-1 text-xs sm:text-sm bg-white/80 backdrop-blur rounded-md shadow hover:bg-white cursor-pointer">📁</label>
+          <input id="filePicker" type="file" accept="image/*" capture="environment" multiple class="hidden" />
+        </div>
       </div>
+
       <div class="flex justify-center">
         <button id="captureBtn" type="button" class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700">📸</button>
       </div>
       <div id="thumbs" class="flex gap-2 overflow-x-auto pb-1"></div>
+      <p id="cameraHint" class="text-xs text-gray-500">Tip: On mobile, allow camera permission. If camera fails, use 📁 to pick a photo.</p>
     </section>
 
     <!-- Parcel Details -->
@@ -190,14 +201,112 @@
       window.location.replace("index.html");
     });
 
-    // Capture simulation
+    // ========= Camera + thumbnails =========
+    const videoEl = document.getElementById('camera');
+    const canvasEl = document.getElementById('snapshotCanvas');
     const thumbs = document.getElementById('thumbs');
-    document.getElementById('captureBtn').addEventListener('click', () => {
-      const shot = document.createElement('div');
-      shot.className = 'w-14 h-14 sm:w-16 sm:h-16 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center text-xs';
-      shot.innerText = '📦';
-      thumbs.appendChild(shot);
+    const captureBtn = document.getElementById('captureBtn');
+    const filePicker = document.getElementById('filePicker');
+    const switchCamBtn = document.getElementById('switchCam');
+
+    let currentStream = null;
+    let useBackCamera = true;
+    let capturedBlobs = [];
+    const objectUrls = new Set();
+
+    async function startCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        document.getElementById('cameraHint').textContent = 'Camera API not available. Use 📁 to select a photo.';
+        return;
+      }
+      if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
+          audio: false
+        });
+      } catch (e) {
+        // fallback without exact constraint
+        try {
+          currentStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: useBackCamera ? 'environment' : 'user' },
+            audio: false
+          });
+        } catch (err) {
+          console.warn('Camera failed, use file picker instead', err);
+          document.getElementById('cameraHint').textContent = 'Could not access camera. Use 📁 to select a photo.';
+          return;
+        }
+      }
+      videoEl.srcObject = currentStream;
+    }
+
+    function addThumbFromUrl(url) {
+      const wrap = document.createElement('div');
+      wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
+
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'shot';
+      img.className = 'w-full h-full object-cover rounded-lg border';
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'absolute -top-1 -right-1 text-xs bg-black/70 text-white rounded-full px-1';
+      rm.textContent = '✖';
+      rm.addEventListener('click', () => {
+        wrap.remove();
+        URL.revokeObjectURL(img.src);
+        objectUrls.delete(img.src);
+        // remove one blob (last-in). If user removed non-last, that's ok for preview-only flow.
+        capturedBlobs.pop();
+      });
+
+      wrap.appendChild(img);
+      wrap.appendChild(rm);
+      thumbs.appendChild(wrap);
+    }
+
+    captureBtn.addEventListener('click', () => {
+      if (!videoEl.videoWidth) return;
+      const w = videoEl.videoWidth, h = videoEl.videoHeight;
+      canvasEl.width = w; canvasEl.height = h;
+      const ctx = canvasEl.getContext('2d');
+      ctx.drawImage(videoEl, 0, 0, w, h);
+      canvasEl.toBlob((blob)=>{
+        if(!blob) return;
+        capturedBlobs.push(blob);
+        const url = URL.createObjectURL(blob);
+        objectUrls.add(url);
+        addThumbFromUrl(url);
+      }, 'image/jpeg', 0.85);
     });
+
+    filePicker.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      for (const f of files) {
+        if (!f.type.startsWith('image/')) continue;
+        capturedBlobs.push(f);
+        const url = URL.createObjectURL(f);
+        objectUrls.add(url);
+        addThumbFromUrl(url);
+      }
+      e.target.value = '';
+    });
+
+    switchCamBtn.addEventListener('click', async () => {
+      useBackCamera = !useBackCamera;
+      await startCamera();
+    });
+
+    // start camera when page loads (https or localhost required)
+    startCamera();
+    window.addEventListener('beforeunload', () => {
+      objectUrls.forEach(u=>URL.revokeObjectURL(u));
+      if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
+    });
+    // helper to expose photo count if you need in console
+    window.__getPhotoCount = () => capturedBlobs.length;
 
     // Enforce single checkbox selection
     function enforceSingleSelection(groupClass){
@@ -212,38 +321,75 @@
 
     // Submit parcel (UI + Firestore)
     document.getElementById('submitBtn').addEventListener('click', async () => {
+      const submitBtn = document.getElementById('submitBtn');
       const name = document.getElementById('parcelName').value.trim();
       const address = document.getElementById('parcelAddress').value.trim();
       const phone = document.getElementById('parcelPhone').value.trim();
       const capturer = document.getElementById('capturerName').value.trim();
       const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
       const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
+      const role = document.getElementById('role').value || '';
+      const plannedShots = parseInt(document.getElementById('shotCount').value, 10) || 0;
+      const photoCount = capturedBlobs.length;
 
       if(!name || !address || !phone || !capturer){ alert('Please fill all fields!'); return; }
 
-      // Save to Firestore
+      // disable while saving
+      submitBtn.disabled = true;
+      const prevText = submitBtn.textContent;
+      submitBtn.textContent = 'Saving...';
+
       try{
         await addDoc(collection(db,"parcels"),{
-          name, address, phone, capturer, status1, status2, timestamp: serverTimestamp()
+          name,
+          address,
+          phone,
+          capturer,
+          role,
+          status1,
+          status2,
+          plannedShots,
+          photoCount,
+          createdByUid: auth.currentUser?.uid || null,
+          createdByEmail: auth.currentUser?.email || null,
+          timestamp: serverTimestamp()
         });
-        console.log("Parcel saved to Firestore!");
-      }catch(err){ console.error("Error saving to Firestore:",err); }
+        // success feedback
+        submitBtn.textContent = 'Saved ✓';
+        setTimeout(()=>{ submitBtn.textContent = prevText; submitBtn.disabled = false; }, 900);
 
-      // Update UI history
-      const historyList = document.getElementById('historyList');
-      const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-      const bubble = document.createElement('div');
-      bubble.className = 'bg-blue-100 rounded-lg p-3 max-w-[85%] break-words';
-      bubble.innerHTML = `<p><b>${name}</b></p><p class='text-xs text-gray-600'>${address}</p><p class='text-xs mt-1'>${status1} • ${status2}</p><span class='text-xs text-gray-400'>${time}</span>`;
-      historyList.appendChild(bubble);
+        // Update UI history
+        const historyList = document.getElementById('historyList');
+        const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        const bubble = document.createElement('div');
+        bubble.className = 'bg-blue-100 rounded-lg p-3 max-w-[85%] break-words';
+        bubble.innerHTML = `<p><b>${name}</b></p>
+                            <p class='text-xs text-gray-600'>${address}</p>
+                            <p class='text-xs mt-1'>${status1 || '—'} • ${status2 || '—'}</p>
+                            <p class='text-xs mt-1'>Role: ${role} • Photos: ${photoCount} • Planned: ${plannedShots}</p>
+                            <span class='text-xs text-gray-400'>${time}</span>`;
+        historyList.prepend(bubble);
 
-      // Reset
-      document.getElementById('parcelName').value='';
-      document.getElementById('parcelAddress').value='';
-      document.getElementById('parcelPhone').value='';
-      document.getElementById('capturerName').value='';
-      thumbs.innerHTML='';
-      document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb=>cb.checked=false);
+        // reset fields and previews
+        document.getElementById('parcelName').value='';
+        document.getElementById('parcelAddress').value='';
+        document.getElementById('parcelPhone').value='';
+        document.getElementById('capturerName').value='';
+        document.getElementById('shotCount').value = '1';
+        document.getElementById('role').value = 'Marketer';
+        document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb=>cb.checked=false);
+
+        // revoke object URLs and clear thumbs + blobs
+        objectUrls.forEach(u=>URL.revokeObjectURL(u));
+        objectUrls.clear();
+        thumbs.innerHTML = '';
+        capturedBlobs = [];
+      }catch(err){
+        console.error("Error saving to Firestore:", err);
+        alert('Save failed: ' + (err?.message || 'unknown error'));
+        submitBtn.disabled = false;
+        submitBtn.textContent = prevText;
+      }
     });
   </script>
 </body>
