@@ -149,277 +149,337 @@
     </section>
 
     <!-- History Section -->
-    <section class="bg-white rounded-xl shadow p-3 sm:p-4 flex flex-col min-h-[10rem] max-h-[40vh]">
-      <h2 class="text-sm sm:text-base font-semibold mb-2">History</h2>
-      <div id="historyList" class="flex-1 overflow-y-auto space-y-3 text-xs sm:text-sm"></div>
-    </section>
+  <div class="mt-6">
+  <div class="flex justify-between items-center mb-2">
+    <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100">📜 Submission History</h2>
+    <button id="toggleHistory" class="text-sm text-blue-600 dark:text-blue-400 underline">
+      Show All
+    </button>
+  </div>
+  <div id="latestHistory" class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 mb-2">
+    <!-- Latest entry will appear here -->
+  </div>
+  <div id="historyList" class="hidden max-h-64 overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow p-2 space-y-2">
+    <!-- Full history appears here -->
+  </div>
+</div>
+
+
   </main>
 
   <footer class="bg-gray-200 text-gray-600 p-3 text-center text-xs sm:text-sm">Parcel Capture • Nicholas Adebayor</footer>
 
-  <!-- Scripts -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+  <!-- Scripts --><script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { query, where, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  // ===== Firebase config =====
+  const firebaseConfig = {
+    apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
+    authDomain: "employee-app-c781d.firebaseapp.com",
+    projectId: "employee-app-c781d",
+    storageBucket: "employee-app-c781d.appspot.com",
+    messagingSenderId: "232631444018",
+    appId: "1:232631444018:web:37b70fe37975abcc1b922b"
+  };
 
-    // your existing firebase config (kept as you provided)
-    const firebaseConfig = {
-      apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
-      authDomain: "employee-app-c781d.firebaseapp.com",
-      projectId: "employee-app-c781d",
-      storageBucket: "employee-app-c781d.appspot.com",
-      messagingSenderId: "232631444018",
-      appId: "1:232631444018:web:37b70fe37975abcc1b922b"
-    };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const storage = getStorage(app);
-
-    // Auth check
-    onAuthStateChanged(auth, (user) => {
-      if (!user) window.location.replace("login.html");
-      else {
-        document.getElementById("userName").textContent = user.displayName || "User";
-        document.getElementById("userEmail").textContent = user.email || "";
-        if(user.photoURL){
-          const photo=document.getElementById("userPhoto");
-          photo.src=user.photoURL;
-          photo.classList.remove("hidden");
-        }
-        history.pushState(null, "", location.href);
-        window.addEventListener("popstate", () => { history.pushState(null, "", location.href); });
+  // ===== Auth check =====
+  onAuthStateChanged(auth, (user) => {
+    if (!user) window.location.replace("login.html");
+    else {
+      document.getElementById("userName").textContent = user.displayName || "User";
+      document.getElementById("userEmail").textContent = user.email || "";
+      if (user.photoURL) {
+        const photo = document.getElementById("userPhoto");
+        photo.src = user.photoURL;
+        photo.classList.remove("hidden");
       }
-    });
+      history.pushState(null, "", location.href);
+      window.addEventListener("popstate", () => { history.pushState(null, "", location.href); });
+    }
+  });
 
-    // Dropdown toggle
-    const userMenuBtn = document.getElementById("userMenuBtn");
-    const userMenu = document.getElementById("userMenu");
-    userMenuBtn.addEventListener("click", () => { userMenu.classList.toggle("hidden"); });
-    window.addEventListener("click", (e) => { if (!userMenuBtn.contains(e.target)) userMenu.classList.add("hidden"); });
+  // ===== Dropdown toggle =====
+  const userMenuBtn = document.getElementById("userMenuBtn");
+  const userMenu = document.getElementById("userMenu");
+  userMenuBtn.addEventListener("click", () => { userMenu.classList.toggle("hidden"); });
+  window.addEventListener("click", (e) => { if (!userMenuBtn.contains(e.target)) userMenu.classList.add("hidden"); });
 
-    // Sign out
-    document.getElementById("signOutBtn").addEventListener("click", async () => {
-      await signOut(auth);
-      window.location.replace("index.html");
-    });
+  // ===== Sign out =====
+  document.getElementById("signOutBtn").addEventListener("click", async () => {
+    await signOut(auth);
+    window.location.replace("index.html");
+  });
 
-    // ========= Camera + thumbnails =========
-    const videoEl = document.getElementById('camera');
-    const canvasEl = document.getElementById('snapshotCanvas');
-    const thumbs = document.getElementById('thumbs');
-    const captureBtn = document.getElementById('captureBtn');
-    const filePicker = document.getElementById('filePicker');
-    const switchCamBtn = document.getElementById('switchCam');
+  // ===== Camera + thumbnails =====
+  const videoEl = document.getElementById('camera');
+  const canvasEl = document.getElementById('snapshotCanvas');
+  const thumbs = document.getElementById('thumbs');
+  const captureBtn = document.getElementById('captureBtn');
+  const filePicker = document.getElementById('filePicker');
+  const switchCamBtn = document.getElementById('switchCam');
 
-    let currentStream = null;
-    let useBackCamera = true;
-    let capturedBlobs = [];       // blobs ready to upload (File or Blob)
-    const objectUrls = new Set(); // preview object URLs (revoke later)
+  let currentStream = null;
+  let useBackCamera = true;
+  let capturedBlobs = [];
+  const objectUrls = new Set();
 
-    async function startCamera() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        document.getElementById('cameraHint').textContent = 'Camera API not available. Use 📁 to select a photo.';
-        return;
-      }
-      if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
+  async function startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      document.getElementById('cameraHint').textContent = 'Camera not available. Use 📁 to select a photo.';
+      return;
+    }
+    if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
+    try {
+      currentStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
+        audio: false
+      });
+    } catch {
       try {
         currentStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
+          video: { facingMode: useBackCamera ? 'environment' : 'user' },
           audio: false
         });
-      } catch {
-        try {
-          currentStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: useBackCamera ? 'environment' : 'user' },
-            audio: false
-          });
-        } catch (err) {
-          console.warn('Camera failed, use file picker instead', err);
-          document.getElementById('cameraHint').textContent = 'Could not access camera. Use 📁 to select a photo.';
-          return;
-        }
+      } catch (err) {
+        console.warn('Camera failed, use file picker instead', err);
+        document.getElementById('cameraHint').textContent = 'Could not access camera. Use 📁 instead.';
+        return;
       }
-      videoEl.srcObject = currentStream;
+    }
+    videoEl.srcObject = currentStream;
+  }
+
+  function addThumbFromUrl(url) {
+    const wrap = document.createElement('div');
+    wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'shot';
+    img.className = 'w-full h-full object-cover rounded-lg border';
+
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'absolute -top-1 -right-1 text-xs bg-black/70 text-white rounded-full px-1';
+    rm.textContent = '✖';
+    rm.addEventListener('click', () => {
+      wrap.remove();
+      if (objectUrls.has(img.src)) {
+        URL.revokeObjectURL(img.src);
+        objectUrls.delete(img.src);
+      }
+      capturedBlobs = capturedBlobs.filter(b => b.url !== url);
+    });
+
+    wrap.appendChild(img);
+    wrap.appendChild(rm);
+    thumbs.appendChild(wrap);
+  }
+
+  // ===== Resize + compress helper (UI only, no upload) =====
+  function resizeAndCompress(fileOrBlob, callback) {
+    const img = new Image();
+    const url = URL.createObjectURL(fileOrBlob);
+    img.onload = () => {
+      const maxW = 400, maxH = 300;
+      let { width, height } = img;
+      const ratio = Math.min(maxW / width, maxH / height, 1);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(blob => {
+        callback(blob);
+        URL.revokeObjectURL(url);
+      }, "image/jpeg", 0.4);
+    };
+    img.src = url;
+  }
+
+  // ===== Camera capture → compress =====
+  captureBtn.addEventListener('click', () => {
+    if (!videoEl.videoWidth) return;
+    const w = videoEl.videoWidth, h = videoEl.videoHeight;
+    canvasEl.width = w; canvasEl.height = h;
+    const ctx = canvasEl.getContext('2d');
+    ctx.drawImage(videoEl, 0, 0, w, h);
+    canvasEl.toBlob((blob) => {
+      if (!blob) return;
+      resizeAndCompress(blob, (resized) => {
+        const url = URL.createObjectURL(resized);
+        objectUrls.add(url);
+        capturedBlobs.push({ blob: resized, url });
+        addThumbFromUrl(url);
+      });
+    }, 'image/jpeg', 0.8);
+  });
+
+  // ===== File picker → compress =====
+  filePicker.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files || []);
+    for (const f of files) {
+      if (!f.type.startsWith('image/')) continue;
+      resizeAndCompress(f, (resized) => {
+        const url = URL.createObjectURL(resized);
+        objectUrls.add(url);
+        capturedBlobs.push({ blob: resized, url });
+        addThumbFromUrl(url);
+      });
+    }
+    e.target.value = '';
+  });
+
+  switchCamBtn.addEventListener('click', async () => {
+    useBackCamera = !useBackCamera;
+    await startCamera();
+  });
+
+  startCamera();
+  window.addEventListener('beforeunload', () => {
+    objectUrls.forEach(u=>URL.revokeObjectURL(u));
+    if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
+  });
+  window.__getPhotoCount = () => capturedBlobs.length;
+
+  // ===== Enforce single checkbox selection =====
+  function enforceSingleSelection(groupClass){
+    document.querySelectorAll(`.${groupClass}`).forEach(cb=>{
+      cb.addEventListener("change", ()=>{
+        if(cb.checked) document.querySelectorAll(`.${groupClass}`).forEach(other => { if(other!==cb) other.checked=false; });
+      });
+    });
+  }
+  enforceSingleSelection("status1-checkbox");
+  enforceSingleSelection("status2-checkbox");
+
+  // ===== SUBMIT (data only, no photo upload) =====
+  document.getElementById('submitBtn').addEventListener('click', async () => {
+    const name = document.getElementById('parcelName').value.trim();
+    const address = document.getElementById('parcelAddress').value.trim();
+    const phone = document.getElementById('parcelPhone').value.trim();
+    const capturer = document.getElementById('capturerName').value.trim();
+    const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
+    const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
+    const role = document.getElementById('role').value || '';
+    const plannedShots = parseInt(document.getElementById('shotCount').value, 10) || 0;
+
+    if (!name || !address || !phone || !capturer) {
+      alert('Please fill all fields!');
+      return;
     }
 
-    function addThumbFromUrl(url) {
-      const wrap = document.createElement('div');
-      wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
+    const submitBtn = document.getElementById('submitBtn');
+    const prevText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
 
-      const img = document.createElement('img');
-      img.src = url;
-      img.alt = 'shot';
-      img.className = 'w-full h-full object-cover rounded-lg border';
-
-      const rm = document.createElement('button');
-      rm.type = 'button';
-      rm.className = 'absolute -top-1 -right-1 text-xs bg-black/70 text-white rounded-full px-1';
-      rm.textContent = '✖';
-      rm.addEventListener('click', () => {
-        wrap.remove();
-        // revoke preview URL
-        if (objectUrls.has(img.src)) {
-          URL.revokeObjectURL(img.src);
-          objectUrls.delete(img.src);
-        }
-        // remove last blob - this is a simple approach: if user removes non-last it's fine for preview-only flow
-        capturedBlobs.pop();
+    try {
+      await addDoc(collection(db, "parcels"), {
+        name, address, phone, capturer, role,
+        status1, status2,
+        plannedShots,
+        photoCount: capturedBlobs.length,  // ✅ only count photos
+        createdByUid: auth.currentUser?.uid || null,
+        createdByEmail: auth.currentUser?.email || null,
+        timestamp: serverTimestamp()
       });
 
-      wrap.appendChild(img);
-      wrap.appendChild(rm);
-      thumbs.appendChild(wrap);
+      submitBtn.textContent = 'Saved ✓';
+      setTimeout(() => { submitBtn.textContent = prevText; submitBtn.disabled = false; }, 900);
+
+      // Clear form + previews
+      document.getElementById('parcelName').value = '';
+      document.getElementById('parcelAddress').value = '';
+      document.getElementById('parcelPhone').value = '';
+      document.getElementById('capturerName').value = '';
+      document.getElementById('shotCount').value = '1';
+      document.getElementById('role').value = 'Marketer';
+      document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
+      objectUrls.forEach(u => URL.revokeObjectURL(u));
+      objectUrls.clear();
+      thumbs.innerHTML = '';
+      capturedBlobs = [];
+
+    } catch (err) {
+      console.error("Error saving to Firestore:", err);
+      alert('Save failed: ' + (err?.message || 'unknown error'));
+      submitBtn.disabled = false;
+      submitBtn.textContent = prevText;
     }
+  });
 
-    captureBtn.addEventListener('click', () => {
-      if (!videoEl.videoWidth) return;
-      const w = videoEl.videoWidth, h = videoEl.videoHeight;
-      canvasEl.width = w; canvasEl.height = h;
-      const ctx = canvasEl.getContext('2d');
-      ctx.drawImage(videoEl, 0, 0, w, h);
-      canvasEl.toBlob((blob)=>{
-        if(!blob) return;
-        capturedBlobs.push(blob);
-        const url = URL.createObjectURL(blob);
-        objectUrls.add(url);
-        addThumbFromUrl(url);
-      }, 'image/jpeg', 0.85);
-    });
 
-    filePicker.addEventListener('change', (e) => {
-      const files = Array.from(e.target.files || []);
-      for (const f of files) {
-        if (!f.type.startsWith('image/')) continue;
-        capturedBlobs.push(f);
-        const url = URL.createObjectURL(f);
-        objectUrls.add(url);
-        addThumbFromUrl(url);
-      }
-      e.target.value = '';
-    });
+// ====== HISTORY DISPLAY ======import { query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    switchCamBtn.addEventListener('click', async () => {
-      useBackCamera = !useBackCamera;
-      await startCamera();
-    });
+const latestHistory = document.getElementById("latestHistory");
+const historyList = document.getElementById("historyList");
+const toggleHistory = document.getElementById("toggleHistory");
 
-    // start camera when page loads (https or localhost required)
-    startCamera();
-    window.addEventListener('beforeunload', () => {
-      objectUrls.forEach(u=>URL.revokeObjectURL(u));
-      if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
-    });
-    window.__getPhotoCount = () => capturedBlobs.length;
+function renderHistoryItem(doc) {
+  const data = doc.data();
+  const div = document.createElement("div");
+  div.className = "p-3 border-b border-gray-200 dark:border-gray-700";
 
-    // Enforce single checkbox selection
-    function enforceSingleSelection(groupClass){
-      document.querySelectorAll(`.${groupClass}`).forEach(cb=>{
-        cb.addEventListener("change", ()=>{
-          if(cb.checked) document.querySelectorAll(`.${groupClass}`).forEach(other => { if(other!==cb) other.checked=false; });
-        });
-      });
-    }
-    enforceSingleSelection("status1-checkbox");
-    enforceSingleSelection("status2-checkbox");
+  const time = data.timestamp?.toDate?.().toLocaleString() || "";
+  div.innerHTML = `
+    <div class="flex justify-between items-center">
+      <h3 class="font-semibold text-gray-900 dark:text-gray-100">${data.name}</h3>
+      <span class="text-xs text-gray-500">${time}</span>
+    </div>
+    <p class="text-sm text-gray-600 dark:text-gray-300">${data.address}</p>
+    <p class="text-xs text-gray-500">📷 ${data.photoCount} | ${data.status1 || ''} ${data.status2 || ''}</p>
+  `;
+  return div;
+}
 
-    // ============ SUBMIT (upload files to Storage then save Firestore doc) ============
-    document.getElementById('submitBtn').addEventListener('click', async () => {
-      const name = document.getElementById('parcelName').value.trim();
-      const address = document.getElementById('parcelAddress').value.trim();
-      const phone = document.getElementById('parcelPhone').value.trim();
-      const capturer = document.getElementById('capturerName').value.trim();
-      const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
-      const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
-      const role = document.getElementById('role').value || '';
-      const plannedShots = parseInt(document.getElementById('shotCount').value, 10) || 0;
-      const photoCount = capturedBlobs.length;
+// Toggle show/hide history
+let showAll = false;
+toggleHistory.addEventListener("click", () => {
+  showAll = !showAll;
+  if (showAll) {
+    historyList.classList.remove("hidden");
+    toggleHistory.textContent = "Hide";
+  } else {
+    historyList.classList.add("hidden");
+    toggleHistory.textContent = "Show All";
+  }
+});
 
-      if(!name || !address || !phone || !capturer){ alert('Please fill all fields!'); return; }
+// Load history
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    const q = query(collection(db, "parcels"), orderBy("timestamp", "desc"));
+    onSnapshot(q, (snapshot) => {
+      latestHistory.innerHTML = "";
+      historyList.innerHTML = "";
 
-      const submitBtn = document.getElementById('submitBtn');
-      const prevText = submitBtn.textContent;
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Uploading...';
-
-      try {
-        // Upload images (if any). Save download URLs in photoURLs array.
-        const photoURLs = [];
-        if (capturedBlobs.length > 0) {
-          for (let i = 0; i < capturedBlobs.length; i++) {
-            const blob = capturedBlobs[i];
-            // use user id if available, time, random fragment to reduce collisions
-            const uidPart = auth.currentUser?.uid ? auth.currentUser.uid.slice(0,8) + '_' : '';
-            const filename = `${uidPart}${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
-            const storageReference = sRef(storage, `parcels/${filename}`);
-
-            // show progress in button
-            submitBtn.textContent = `Uploading ${i+1}/${capturedBlobs.length}...`;
-
-            await uploadBytes(storageReference, blob);
-            const url = await getDownloadURL(storageReference);
-            photoURLs.push(url);
-          }
+      let first = true;
+      snapshot.forEach((doc) => {
+        const item = renderHistoryItem(doc);
+        if (first) {
+          latestHistory.appendChild(item);
+          first = false;
+        } else {
+          historyList.appendChild(item);
         }
-
-        // Save Firestore document
-        await addDoc(collection(db,"parcels"),{
-          name,
-          address,
-          phone,
-          capturer,
-          role,
-          status1,
-          status2,
-          plannedShots,
-          photoCount: photoURLs.length,
-          photos: photoURLs,
-          createdByUid: auth.currentUser?.uid || null,
-          createdByEmail: auth.currentUser?.email || null,
-          timestamp: serverTimestamp()
-        });
-
-        // success feedback
-        submitBtn.textContent = 'Saved ✓';
-        setTimeout(()=>{ submitBtn.textContent = prevText; submitBtn.disabled = false; }, 900);
-
-        // Update UI history (prepend)
-        const historyList = document.getElementById('historyList');
-        const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-        const bubble = document.createElement('div');
-        bubble.className = 'bg-blue-100 rounded-lg p-3 max-w-[85%] break-words';
-        bubble.innerHTML = `<p><b>${name}</b></p>
-                            <p class='text-xs text-gray-600'>${address}</p>
-                            <p class='text-xs mt-1'>${status1 || '—'} • ${status2 || '—'}</p>
-                            <p class='text-xs mt-1'>Role: ${role} • Photos: ${photoURLs.length} • Planned: ${plannedShots}</p>
-                            <span class='text-xs text-gray-400'>${time}</span>`;
-        historyList.prepend(bubble);
-
-        // Reset form inputs and previews
-        document.getElementById('parcelName').value='';
-        document.getElementById('parcelAddress').value='';
-        document.getElementById('parcelPhone').value='';
-        document.getElementById('capturerName').value='';
-        document.getElementById('shotCount').value = '1';
-        document.getElementById('role').value = 'Marketer';
-        document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb=>cb.checked=false);
-
-        // revoke preview object URLs and clear
-        objectUrls.forEach(u=>URL.revokeObjectURL(u));
-        objectUrls.clear();
-        thumbs.innerHTML = '';
-        capturedBlobs = [];
-
-      } catch(err) {
-        console.error("Error saving to Firestore / Storage:", err);
-        alert('Save failed: ' + (err?.message || 'unknown error'));
-        submitBtn.disabled = false;
-        submitBtn.textContent = prevText;
-      }
+      });
     });
-  </script>
+  }
+});
+
+</script>
+
+
 </body>
 </html>
