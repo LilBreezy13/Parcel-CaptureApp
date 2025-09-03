@@ -55,7 +55,6 @@
     <section class="bg-white rounded-xl shadow p-3 sm:p-4 space-y-3">
       <h2 class="text-sm sm:text-base font-semibold">Capture Parcel</h2>
       <div class="flex flex-col sm:flex-row gap-2">
-        <!-- value attributes set so we can parse numbers reliably -->
         <select id="shotCount" class="w-full border rounded-md p-2 text-base sm:text-sm">
           <option value="1">1 Shot</option>
           <option value="2">2 Shots</option>
@@ -163,7 +162,9 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
+    // your existing firebase config (kept as you provided)
     const firebaseConfig = {
       apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
       authDomain: "employee-app-c781d.firebaseapp.com",
@@ -176,6 +177,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const storage = getStorage(app);
 
     // Auth check
     onAuthStateChanged(auth, (user) => {
@@ -183,7 +185,11 @@
       else {
         document.getElementById("userName").textContent = user.displayName || "User";
         document.getElementById("userEmail").textContent = user.email || "";
-        if(user.photoURL){const photo=document.getElementById("userPhoto");photo.src=user.photoURL;photo.classList.remove("hidden");}
+        if(user.photoURL){
+          const photo=document.getElementById("userPhoto");
+          photo.src=user.photoURL;
+          photo.classList.remove("hidden");
+        }
         history.pushState(null, "", location.href);
         window.addEventListener("popstate", () => { history.pushState(null, "", location.href); });
       }
@@ -211,8 +217,8 @@
 
     let currentStream = null;
     let useBackCamera = true;
-    let capturedBlobs = [];
-    const objectUrls = new Set();
+    let capturedBlobs = [];       // blobs ready to upload (File or Blob)
+    const objectUrls = new Set(); // preview object URLs (revoke later)
 
     async function startCamera() {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -225,8 +231,7 @@
           video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
           audio: false
         });
-      } catch (e) {
-        // fallback without exact constraint
+      } catch {
         try {
           currentStream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: useBackCamera ? 'environment' : 'user' },
@@ -256,9 +261,12 @@
       rm.textContent = '✖';
       rm.addEventListener('click', () => {
         wrap.remove();
-        URL.revokeObjectURL(img.src);
-        objectUrls.delete(img.src);
-        // remove one blob (last-in). If user removed non-last, that's ok for preview-only flow.
+        // revoke preview URL
+        if (objectUrls.has(img.src)) {
+          URL.revokeObjectURL(img.src);
+          objectUrls.delete(img.src);
+        }
+        // remove last blob - this is a simple approach: if user removes non-last it's fine for preview-only flow
         capturedBlobs.pop();
       });
 
@@ -305,7 +313,6 @@
       objectUrls.forEach(u=>URL.revokeObjectURL(u));
       if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
     });
-    // helper to expose photo count if you need in console
     window.__getPhotoCount = () => capturedBlobs.length;
 
     // Enforce single checkbox selection
@@ -319,9 +326,8 @@
     enforceSingleSelection("status1-checkbox");
     enforceSingleSelection("status2-checkbox");
 
-    // Submit parcel (UI + Firestore)
+    // ============ SUBMIT (upload files to Storage then save Firestore doc) ============
     document.getElementById('submitBtn').addEventListener('click', async () => {
-      const submitBtn = document.getElementById('submitBtn');
       const name = document.getElementById('parcelName').value.trim();
       const address = document.getElementById('parcelAddress').value.trim();
       const phone = document.getElementById('parcelPhone').value.trim();
@@ -334,12 +340,32 @@
 
       if(!name || !address || !phone || !capturer){ alert('Please fill all fields!'); return; }
 
-      // disable while saving
-      submitBtn.disabled = true;
+      const submitBtn = document.getElementById('submitBtn');
       const prevText = submitBtn.textContent;
-      submitBtn.textContent = 'Saving...';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Uploading...';
 
-      try{
+      try {
+        // Upload images (if any). Save download URLs in photoURLs array.
+        const photoURLs = [];
+        if (capturedBlobs.length > 0) {
+          for (let i = 0; i < capturedBlobs.length; i++) {
+            const blob = capturedBlobs[i];
+            // use user id if available, time, random fragment to reduce collisions
+            const uidPart = auth.currentUser?.uid ? auth.currentUser.uid.slice(0,8) + '_' : '';
+            const filename = `${uidPart}${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+            const storageReference = sRef(storage, `parcels/${filename}`);
+
+            // show progress in button
+            submitBtn.textContent = `Uploading ${i+1}/${capturedBlobs.length}...`;
+
+            await uploadBytes(storageReference, blob);
+            const url = await getDownloadURL(storageReference);
+            photoURLs.push(url);
+          }
+        }
+
+        // Save Firestore document
         await addDoc(collection(db,"parcels"),{
           name,
           address,
@@ -349,16 +375,18 @@
           status1,
           status2,
           plannedShots,
-          photoCount,
+          photoCount: photoURLs.length,
+          photos: photoURLs,
           createdByUid: auth.currentUser?.uid || null,
           createdByEmail: auth.currentUser?.email || null,
           timestamp: serverTimestamp()
         });
+
         // success feedback
         submitBtn.textContent = 'Saved ✓';
         setTimeout(()=>{ submitBtn.textContent = prevText; submitBtn.disabled = false; }, 900);
 
-        // Update UI history
+        // Update UI history (prepend)
         const historyList = document.getElementById('historyList');
         const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
         const bubble = document.createElement('div');
@@ -366,11 +394,11 @@
         bubble.innerHTML = `<p><b>${name}</b></p>
                             <p class='text-xs text-gray-600'>${address}</p>
                             <p class='text-xs mt-1'>${status1 || '—'} • ${status2 || '—'}</p>
-                            <p class='text-xs mt-1'>Role: ${role} • Photos: ${photoCount} • Planned: ${plannedShots}</p>
+                            <p class='text-xs mt-1'>Role: ${role} • Photos: ${photoURLs.length} • Planned: ${plannedShots}</p>
                             <span class='text-xs text-gray-400'>${time}</span>`;
         historyList.prepend(bubble);
 
-        // reset fields and previews
+        // Reset form inputs and previews
         document.getElementById('parcelName').value='';
         document.getElementById('parcelAddress').value='';
         document.getElementById('parcelPhone').value='';
@@ -379,13 +407,14 @@
         document.getElementById('role').value = 'Marketer';
         document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb=>cb.checked=false);
 
-        // revoke object URLs and clear thumbs + blobs
+        // revoke preview object URLs and clear
         objectUrls.forEach(u=>URL.revokeObjectURL(u));
         objectUrls.clear();
         thumbs.innerHTML = '';
         capturedBlobs = [];
-      }catch(err){
-        console.error("Error saving to Firestore:", err);
+
+      } catch(err) {
+        console.error("Error saving to Firestore / Storage:", err);
         alert('Save failed: ' + (err?.message || 'unknown error'));
         submitBtn.disabled = false;
         submitBtn.textContent = prevText;
