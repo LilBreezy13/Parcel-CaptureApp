@@ -1,254 +1,746 @@
 <!doctype html>
-<html lang="en" class="light">
+<html lang="en" class="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Parcel Officer Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { darkMode: 'class' }
-  </script>
-</head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-300">
 
-  <!-- Navbar -->
-  <header class="bg-white dark:bg-gray-800 shadow-md p-3 sm:p-4 flex items-center justify-between">
-    <h1 class="text-base sm:text-lg font-semibold">Parcel Officer Dashboard</h1>
-    <div class="flex items-center gap-3 sm:gap-4">
-      <!-- Theme Toggle -->
-      <button id="themeToggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:scale-110 transition text-sm sm:text-base">🌙</button>
-      <!-- Notifications -->
-      <div class="relative">
-        <button id="notifBtn" class="relative p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:scale-110 transition text-sm sm:text-base">🔔
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root { --neon-1:#3B82F6; --neon-2:#8B5CF6; --muted: #94a3b8; }
+    body { background: linear-gradient(180deg,#050816 0%, #07102a 100%); color: #e6eef8; }
+    html.light body { background: #f7f9fc; color: #0b1222; }
+
+    .glass {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.03);
+      backdrop-filter: blur(6px);
+    }
+    html.light .glass {
+      background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.9));
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .muted { color: var(--muted); }
+    html.light .muted { color:#475569; }
+
+    .pie { width:86px;height:86px;border-radius:9999px;display:inline-block;box-shadow:0 8px 24px rgba(2,6,23,0.6); }
+
+    .card-compact { min-height: 110px; }
+
+    .scroll-slim::-webkit-scrollbar { width:8px; }
+    .scroll-slim::-webkit-scrollbar-thumb { background: rgba(148,163,184,.18); border-radius:9999px; }
+
+    #map { height:260px; border-radius:12px; }
+
+    .status-badge { font-size:0.72rem; padding:0.18rem .5rem; border-radius:999px; display:inline-block; margin-right:6px; }
+    .badge-paid { background:#063d1b; color:#86efac; }
+    .badge-rejected { background:#2a0a09; color:#ffbdba; }
+    .badge-part { background:#2f1a04; color:#ffd8a8; }
+    .badge-not { background:#111827; color:#94a3b8; }
+    .badge-short { background:#3c2d00; color:#fde68a; }
+    .badge-new { background:#08203a; color:#93c5fd; }
+
+    .highlight {
+      box-shadow: 0 0 0 4px rgba(99,102,241,0.12);
+      transition: box-shadow .22s ease;
+      border-radius: 10px;
+    }
+
+    @media (max-width:900px) { aside { display:none } #mobileOpen{ display:inline-flex } }
+
+    /* Ensure selects are readable in both themes */
+    select, option {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+    }
+    .select-light { background: white; color: #0b1222; }
+    .select-dark { background: rgba(255,255,255,0.02); color: #e6eef8; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Sidebar -->
+  <aside class="w-72 p-4 fixed inset-y-0 left-0 bg-[rgba(6,10,22,0.72)] border-r border-white/4 z-40">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(139,92,246,0.12)] flex items-center justify-center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 7h18M7 3v4M17 3v4M3 17h18M7 21v-4M17 21v-4" stroke="white" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div class="text-lg font-semibold">ParcelOps</div>
+        <div class="text-xs muted">Officer Dashboard</div>
+      </div>
+    </div>
+
+    <nav class="space-y-2">
+      <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="dashboard">🏠 Dashboard</button>
+      <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="parcels">📦 Parcels</button>
+      <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="reports">📈 Reports</button>
+      <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="settings">⚙️ Settings</button>
+    </nav>
+
+    <div class="mt-6 p-3 rounded-lg glass text-xs muted">
+      <div>Targets</div>
+      <div class="mt-2 w-full bg-white/5 rounded-full h-2 overflow-hidden"><div id="targetProgress" class="h-2" style="width:42%; background:linear-gradient(90deg,var(--neon-1),var(--neon-2));"></div></div>
+      <div class="mt-2 text-xs muted">Weekly completion</div>
+    </div>
+
+    <div class="text-xs muted mt-6">© By Nicholas</div>
+  </aside>
+
+  <button id="mobileOpen" class="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-[rgba(0,0,0,0.4)]">☰</button>
+
+  <!-- Main -->
+  <div class="ml-72 p-6">
+    <!-- topbar -->
+    <header class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <input id="searchInput" placeholder="Search name, address, phone or date..." class="w-96 p-2 rounded-xl bg-[rgba(255,255,255,0.02)] border border-white/6" />
+        <select id="statusFilter" class="p-2 rounded-xl border border-white/6 select-dark">
+          <option value="all">All statuses</option>
+          <option value="paid">Paid</option>
+          <option value="part payment">Part Payment</option>
+          <option value="not paid">Not Paid</option>
+          <option value="rejected">Rejected</option>
+          <option value="shortages">Shortages</option>
+          <option value="new">New School</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <button id="notifBtn" class="p-2 rounded-lg bg-[rgba(255,255,255,0.02)]">🔔</button>
           <span id="notifBadge" class="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full px-1">0</span>
-        </button>
-        <div id="notifDropdown" class="hidden absolute right-0 mt-2 w-56 sm:w-64 bg-white dark:bg-gray-800 shadow-lg rounded-md p-3 text-xs sm:text-sm z-50">
-          <p class="font-semibold mb-2">New Submissions</p>
-          <ul id="notifList" class="space-y-2 text-xs"></ul>
+
+          <div id="notifDropdown" class="hidden absolute right-0 mt-2 w-80 bg-[rgba(6,10,22,0.92)] p-3 rounded-xl shadow-lg max-h-96 overflow-y-auto scroll-slim z-50">
+            <p class="font-semibold mb-2">New Submissions</p>
+            <ul id="notifList" class="space-y-2"></ul>
+          </div>
+        </div>
+
+        <button id="themeToggle" class="p-2 rounded-xl bg-[rgba(255,255,255,0.02)]">☀️</button>
+
+        <div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-[rgba(255,255,255,0.02)]">
+          <img id="profileImg" src="https://via.placeholder.com/36" class="w-9 h-9 rounded-full border-2 border-[rgba(59,130,246,0.9)]" alt="profile"/>
+          <div class="text-sm">Officer</div>
         </div>
       </div>
-      <!-- Profile -->
-      <div class="flex items-center gap-2">
-        <span class="hidden sm:block font-medium" id="profileName">Officer</span>
-        <img src="https://via.placeholder.com/32" alt="profile" id="profileImg" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-blue-600">
-      </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- Main Content -->
-  <main class="flex-1 p-2 sm:p-4 max-w-7xl mx-auto w-full flex flex-col">
-    <!-- Metrics -->
-    <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-6 text-xs sm:text-sm">
-      <div id="metricRejected" class="p-3 sm:p-4 rounded-xl shadow bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">Rejected: <b>0</b></div>
-      <div id="metricShortages" class="p-3 sm:p-4 rounded-xl shadow bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">Shortages: <b>0</b></div>
-      <div id="metricNew" class="p-3 sm:p-4 rounded-xl shadow bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">New Schools: <b>0</b></div>
-      <div id="metricPaid" class="p-3 sm:p-4 rounded-xl shadow bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">Paid: <b>0</b></div>
-      <div id="metricPart" class="p-3 sm:p-4 rounded-xl shadow bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">Part Payment: <b>0</b> / Not Paid: <b>0</b></div>
-    </div>
+    <!-- Pages container -->
+    <main id="pages" class="space-y-6">
+      <!-- Dashboard page -->
+      <section id="page-dashboard" class="">
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div class="col-span-2 space-y-6">
+            <!-- KPI row -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="p-4 rounded-xl glass card-compact">
+                <div class="text-xs muted">Rejected</div>
+                <div class="text-2xl font-semibold" id="metricRejected">0</div>
+                <div class="text-xs muted mt-2">This week</div>
+              </div>
+              <div class="p-4 rounded-xl glass card-compact">
+                <div class="text-xs muted">Shortages</div>
+                <div class="text-2xl font-semibold" id="metricShortages">0</div>
+                <div class="text-xs muted mt-2">This week</div>
+              </div>
+              <div class="p-4 rounded-xl glass card-compact">
+                <div class="text-xs muted">New Schools</div>
+                <div class="text-2xl font-semibold" id="metricNew">0</div>
+                <div class="text-xs muted mt-2">This week</div>
+              </div>
+              <div class="p-4 rounded-xl glass card-compact">
+                <div class="text-xs muted">Paid</div>
+                <div class="text-2xl font-semibold" id="metricPaid">0</div>
+                <div class="text-xs muted mt-2">This week</div>
+              </div>
 
-    <!-- Search & Export -->
-    <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center mb-4 sm:mb-6">
-      <input id="searchInput" placeholder="Search by name, address, phone or date..." class="border rounded-md p-2 flex-1 text-xs sm:text-sm dark:bg-gray-700 dark:border-gray-600">
-      <select id="statusFilter" class="border rounded-md p-2 text-xs sm:text-sm dark:bg-gray-700 dark:border-gray-600">
-        <option value="all">All Statuses</option>
-        <option value="rejected">Rejected</option>
-        <option value="shortages">Shortages</option>
-        <option value="new_school">New School</option>
-        <option value="paid">Paid</option>
-        <option value="part_payment">Part Payment</option>
-        <option value="not_paid">Not Paid</option>
-      </select>
-      <button id="exportCsv" class="px-3 sm:px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md text-xs sm:text-sm hover:bg-gray-300 dark:hover:bg-gray-600">Export CSV</button>
-    </div>
+              
+            </div>
 
-    <!-- Day Sheets -->
-    <div id="daySheets" class="flex-1 overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow p-3 sm:p-4 transition text-xs sm:text-sm"></div>
+            <!-- mini charts row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="p-4 rounded-xl glass">
+                <div class="flex items-center justify-between mb-2">
+                  <div><div class="font-semibold">Parcels Over Time</div><div class="text-xs muted">Today / Yesterday / Older</div></div>
+                  <div class="text-xs muted">Recent</div>
+                </div>
+                <div class="space-y-2">
+                  <div class="text-xs">Today <div class="h-2 bg-white/5 rounded mt-1"><div id="barToday" class="h-2 bg-gradient-to-r from-[rgba(59,130,246,0.95)] to-[rgba(139,92,246,0.85)] rounded" style="width:0%"></div></div></div>
+                  <div class="text-xs">Yesterday <div class="h-2 bg-white/5 rounded mt-1"><div id="barYesterday" class="h-2 bg-gradient-to-r from-[rgba(6,182,212,0.95)] to-[rgba(59,130,246,0.85)] rounded" style="width:0%"></div></div></div>
+                  <div class="text-xs">Older <div class="h-2 bg-white/5 rounded mt-1"><div id="barOlder" class="h-2 bg-gradient-to-r from-[rgba(139,92,246,0.95)] to-[rgba(59,130,246,0.85)] rounded" style="width:0%"></div></div></div>
+                </div>
+              </div>
 
-    <!-- Sheet Tabs -->
-    <div id="tabsContainer" class="flex gap-2 mt-3 sm:mt-4 overflow-x-auto border-t pt-2 dark:border-gray-700 text-xs sm:text-sm"></div>
-  </main>
+              <div class="p-4 rounded-xl glass">
+                <div class="flex items-center justify-between mb-2">
+                  <div><div class="font-semibold">Status Distribution</div><div class="text-xs muted">Snapshot</div></div>
+                </div>
+                <div class="space-y-2">
+                  <div class="text-xs">Rejected <div class="h-2 bg-white/5 rounded mt-1"><div id="barRejected" class="h-2 bg-red-500 rounded" style="width:0%"></div></div></div>
+                  <div class="text-xs">Shortages <div class="h-2 bg-white/5 rounded mt-1"><div id="barShortages" class="h-2 bg-yellow-500 rounded" style="width:0%"></div></div></div>
+                  <div class="text-xs">Paid <div class="h-2 bg-white/5 rounded mt-1"><div id="barPaid" class="h-2 bg-green-500 rounded" style="width:0%"></div></div></div>
+                </div>
+              </div>
+
+              <div class="p-4 rounded-xl glass text-center">
+                <div class="font-semibold">Payment Split</div>
+                <div class="text-xs muted mb-3">Paid • Part • Not Paid</div>
+                <div id="piePayment" class="pie mx-auto"></div>
+                <div class="flex justify-between mt-3 text-xs muted px-6"><div id="paidPct">0%</div><div id="partPct">0%</div><div id="notPct">0%</div></div>
+              </div>
+            </div>
+
+            <!-- Map -->
+            <div class="p-4 rounded-xl glass">
+              <div class="flex items-center justify-between mb-2">
+                <div><div class="font-semibold">Parcel Locations</div><div class="text-xs muted">Markers show parcels; circles aggregate regions</div></div>
+                <div class="text-xs muted">Interactive</div>
+              </div>
+              <div id="map" class="mb-3"></div>
+              <div class="text-xs muted">Markers: <span id="mapCount">0</span> • Regions: <span id="regionCount">0</span></div>
+            </div>
+          </div>
+
+          <!-- Right column -->
+          <aside class="space-y-6">
+            <div class="p-4 rounded-xl glass">
+              <div class="flex items-center justify-between">
+                <div><div class="font-semibold">Latest Parcels</div><div class="text-xs muted">Recent submissions</div></div>
+                <button id="exportCsv" class="px-3 py-1 rounded bg-[rgba(255,255,255,0.02)] text-sm">Export</button>
+              </div>
+              <div id="latestList" class="mt-3 space-y-3 max-h-80 overflow-y-auto scroll-slim"></div>
+            </div>
+
+            <div class="p-4 rounded-xl glass">
+              <div class="font-semibold">Notifications</div>
+              <div id="notifPanel" class="mt-3 text-xs muted">Open bell to view new entries. Click an item to open & highlight parcel.</div>
+            </div>
+
+            <div class="p-4 rounded-xl glass">
+              <div class="font-semibold">Region Summary</div>
+              <div id="regionSummary" class="mt-3 text-sm muted"></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- Parcels page -->
+      <section id="page-parcels" class="hidden">
+        <div class="flex items-center justify-between mb-3">
+          <div><h2 class="text-lg font-semibold">Parcels</h2><div class="text-xs muted">All entries grouped by date</div></div>
+        </div>
+
+        <div class="p-4 rounded-xl glass">
+          <div id="parcelsTabs" class="flex gap-2 mb-4"></div>
+          <div id="parcelsSheets" class="space-y-3"></div>
+        </div>
+      </section>
+
+      <!-- Reports placeholder -->
+      <section id="page-reports" class="hidden">
+        <div class="p-4 rounded-xl glass"><h2 class="font-semibold">Reports</h2><p class="text-sm muted mt-2">Coming soon...</p></div>
+      </section>
+
+      <!-- Settings placeholder -->
+      <section id="page-settings" class="hidden">
+        <div class="p-4 rounded-xl glass"><h2 class="font-semibold">Settings</h2><p class="text-sm muted mt-2">Coming soon...</p></div>
+      </section>
+    </main>
+  </div>
 
   <!-- Modal -->
-  <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-lg max-w-3xl w-full relative transition text-xs sm:text-sm">
-      <button onclick="closeModal()" class="absolute top-2 right-2 text-gray-500 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white">✖</button>
-      <h2 class="text-sm sm:text-lg font-semibold mb-2">Parcel Details</h2>
-      <div id="modalContent" class="space-y-2"></div>
+  <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div class="bg-[rgba(6,10,22,0.95)] p-6 rounded-xl w-full max-w-2xl border border-white/6">
+      <button id="closeModal" class="float-right">✖</button>
+      <h3 class="text-xl font-semibold mb-3">Parcel Details</h3>
+      <div id="modalContent" class="text-sm"></div>
     </div>
   </div>
 
-  <footer class="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 p-3 sm:p-4 text-center text-xs sm:text-sm">Parcel Officer Dashboard • Designed by Nicholas</footer>
+  <!-- Script (full, functional) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, query, orderBy, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    // Firebase config (unchanged)
+    const firebaseConfig = {
+      apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
+      authDomain: "employee-app-c781d.firebaseapp.com",
+      projectId: "employee-app-c781d",
+      storageBucket: "employee-app-c781d.appspot.com",
+      messagingSenderId: "232631444018",
+      appId: "1:232631444018:web:37b70fe37975abcc1b922b"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-// ---------------------------
-// UI helpers
-// ---------------------------
-const toggle=document.getElementById('themeToggle');
-toggle.addEventListener('click',()=>{document.documentElement.classList.toggle('dark'); toggle.textContent=document.documentElement.classList.contains('dark')?'☀️':'🌙';});
-window.openModal=html=>{document.getElementById('modalContent').innerHTML=html; document.getElementById('detailModal').classList.remove('hidden');};
-window.closeModal=()=>{document.getElementById('detailModal').classList.add('hidden');};
-window.showSheet=id=>{
-  document.querySelectorAll('.day-sheet').forEach(s=>s.classList.add('hidden'));
-  const active=document.getElementById('sheet-'+id);
-  if(active) active.classList.remove('hidden');
-};
+    // UI refs
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const notifBtn = document.getElementById('notifBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+    const notifList = document.getElementById('notifList');
+    const notifBadge = document.getElementById('notifBadge');
+    const latestList = document.getElementById('latestList');
+    const mapCountEl = document.getElementById('mapCount');
+    const regionCountEl = document.getElementById('regionCount');
+    const regionSummaryEl = document.getElementById('regionSummary');
+    const piePayment = document.getElementById('piePayment');
+    const paidPctEl = document.getElementById('paidPct');
+    const partPctEl = document.getElementById('partPct');
+    const notPctEl = document.getElementById('notPct');
 
-// ---------------------------
-// Firebase init
-// ---------------------------
-const firebaseConfig={
-  apiKey:"AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
-  authDomain:"employee-app-c781d.firebaseapp.com",
-  projectId:"employee-app-c781d",
-  storageBucket:"employee-app-c781d.appspot.com",
-  messagingSenderId:"232631444018",
-  appId:"1:232631444018:web:37b70fe37975abcc1b922b"
-};
-const app=initializeApp(firebaseConfig);
-const db=getFirestore(app);
+    // last-seen for notifications
+    const lastSeenKey = 'parcel_notif_last_seen_v1';
+    function getLastSeen(){ return Number(localStorage.getItem(lastSeenKey) || 0); }
+    function setLastSeen(ms){ localStorage.setItem(lastSeenKey, String(ms)); }
 
-// ---------------------------
-// Helpers
-// ---------------------------
-function formatTimestamp(ts){if(!ts)return''; if(typeof ts.toDate==='function')return ts.toDate().toLocaleString(); if(ts.seconds)return new Date(ts.seconds*1000).toLocaleString(); try{return new Date(ts).toLocaleString()}catch{return''}}
-function createBadge(text,colorClass='bg-green-200 text-green-800'){return`<span class="px-2 py-1 text-xs rounded-full ${colorClass} dark:bg-opacity-80">${text}</span>`;}
-function escapeHtml(unsafe){if(unsafe===null||unsafe===undefined)return''; return String(unsafe).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
-
-// ---------------------------
-// Realtime listener
-// ---------------------------
-const notifBtn=document.getElementById('notifBtn');
-const notifDropdown=document.getElementById('notifDropdown');
-const notifListEl=document.getElementById('notifList');
-const notifBadge=document.getElementById('notifBadge');
-
-notifBtn.addEventListener('click',()=>{notifDropdown.classList.toggle('hidden'); if(notifDropdown.classList.contains('hidden')) notifBadge.textContent='0';});
-
-const parcelsQuery=query(collection(db,'parcels'),orderBy('timestamp','desc'));
-onSnapshot(parcelsQuery,snapshot=>{
-  // organize parcels by date
-  const today=new Date(); today.setHours(0,0,0,0);
-  const yesterday=new Date(today); yesterday.setDate(today.getDate()-1);
-  const older={}; const byDate={today:[], yesterday:[]};
-  snapshot.docs.forEach(doc=>{
-    const data=doc.data();
-    const ts=data.timestamp?new Date(data.timestamp.seconds*1000):new Date();
-    ts.setHours(0,0,0,0);
-    const diff=(today-ts)/(1000*60*60*24);
-    if(diff<1) byDate.today.push({...data,id:doc.id});
-    else if(diff<2) byDate.yesterday.push({...data,id:doc.id});
-    else{
-      const dStr=ts.toISOString().split('T')[0];
-      if(!older[dStr]) older[dStr]=[];
-      older[dStr].push({...data,id:doc.id});
-    }
-  });
-
-  // build tabs
-  const daySheets=document.getElementById('daySheets');
-  const tabsContainer=document.getElementById('tabsContainer');
-  daySheets.innerHTML=''; tabsContainer.innerHTML='';
-  const allDates=[{key:'today',label:'Today',parcels:byDate.today},{key:'yesterday',label:'Yesterday',parcels:byDate.yesterday}];
-  Object.keys(older).sort().forEach(k=>allDates.push({key:k,label:k,parcels:older[k]}));
-
-  allDates.forEach((day,i)=>{
-    const sheet=document.createElement('div');
-    sheet.className='day-sheet '+(i>0?'hidden':''); sheet.id='sheet-'+day.key;
-    const h=document.createElement('h2'); h.className='text-sm sm:text-lg font-semibold mb-2 sm:mb-3'; h.textContent=day.label; sheet.appendChild(h);
-    const grid=document.createElement('div'); grid.className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4';
-    day.parcels.forEach(d=>{
-      const photos=(d.photos||[]).slice(0,3).map(u=>`<img src="${u}" class="w-40 h-28 object-cover rounded-md">`).join('')||'<img src="https://via.placeholder.com/400x200" class="w-40 h-28 object-cover rounded-md">';
-      const statusText=[d.status1,d.status2].filter(Boolean).join(' • ')||'Pending';
-      const card=document.createElement('div'); card.className='bg-gray-50 dark:bg-gray-700 p-3 sm:p-4 rounded-xl shadow hover:shadow-lg transition';
-      card.innerHTML=`<div class="flex gap-2 overflow-x-auto mb-2 sm:mb-3">${photos}</div>
-      <h3 class="font-semibold text-sm sm:text-base">${escapeHtml(d.name||d.school||'Unnamed Parcel')}</h3>
-      <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">${escapeHtml(d.address||d.location||'')}</p>
-      <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Contact: ${escapeHtml(d.phone||d.contact||'')}</p>
-      <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Captured by: ${escapeHtml(d.capturer||d.officer||'')} ${d.timestamp? ' at ' + formatTimestamp(d.timestamp):''}</p>
-      <div class="flex flex-wrap gap-2 mt-2">${createBadge(statusText)}</div>
-      <div class="flex flex-wrap gap-2 mt-3">
-        <button class="view-btn px-3 py-1 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">View</button>
-      </div>`;
-      card.querySelector('.view-btn').addEventListener('click',()=>{
-        const fullPhotos=(d.photos||[]).map(u=>`<img src="${u}" class="w-48 h-32 object-cover rounded-md">`).join('')||'<img src="https://via.placeholder.com/500x300" class="w-48 h-32 object-cover rounded-md">';
-        openModal(`<div class="flex gap-2 overflow-x-auto mb-3">${fullPhotos}</div>
-          <p><b>Name:</b> ${escapeHtml(d.name||d.school||'')}</p>
-          <p><b>Address:</b> ${escapeHtml(d.address||d.location||'')}</p>
-          <p><b>Phone:</b> ${escapeHtml(d.phone||d.contact||'')}</p>
-          <p><b>Captured by:</b> ${escapeHtml(d.capturer||d.officer||'')} ${d.timestamp? ' at ' + formatTimestamp(d.timestamp):''}</p>
-          <p><b>Status:</b> ${escapeHtml(statusText)}</p>
-          <p><b>Photos:</b> ${(d.photos||[]).length}</p>
-          <p class="text-xs text-gray-500 mt-2">Doc ID: ${d.id}</p>`);
+    // page sections & nav
+    const pages = {
+      dashboard: document.getElementById('page-dashboard'),
+      parcels: document.getElementById('page-parcels'),
+      reports: document.getElementById('page-reports'),
+      settings: document.getElementById('page-settings')
+    };
+    document.querySelectorAll('.nav-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=> {
+        document.querySelectorAll('.nav-btn').forEach(n=>n.classList.remove('bg-[rgba(59,130,246,0.14)]'));
+        btn.classList.add('bg-[rgba(59,130,246,0.14)]');
+        const page = btn.dataset.page;
+        Object.values(pages).forEach(p=>p.classList.add('hidden'));
+        pages[page]?.classList.remove('hidden');
+        window.scrollTo(0,0);
       });
-      grid.appendChild(card);
-
-      // add to notification
-      const notifItem=document.createElement('li'); notifItem.className='p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700'; notifItem.textContent=`${d.name||d.school||'Parcel'} — ${statusText}`; notifListEl.appendChild(notifItem);
     });
-    sheet.appendChild(grid); daySheets.appendChild(sheet);
+    // default highlight dashboard
+    document.querySelector('.nav-btn[data-page="dashboard"]').classList.add('bg-[rgba(59,130,246,0.14)]');
 
-    const tab=document.createElement('button'); tab.className='px-3 sm:px-4 py-2 rounded-md '+(i===0?'bg-blue-600 text-white':'bg-gray-200 dark:bg-gray-700'); tab.textContent=day.label; tab.addEventListener('click',()=>showSheet(day.key)); tabsContainer.appendChild(tab);
-  });
+    // theme toggle
+    const themeToggle = document.getElementById('themeToggle');
+    themeToggle.addEventListener('click', ()=> {
+      document.documentElement.classList.toggle('light');
+      // update select readable classes
+      const sel = document.getElementById('statusFilter');
+      if (document.documentElement.classList.contains('light')) {
+        sel.classList.remove('select-dark'); sel.classList.add('select-light');
+        themeToggle.textContent = '🌙';
+      } else {
+        sel.classList.remove('select-light'); sel.classList.add('select-dark');
+        themeToggle.textContent = '☀️';
+      }
+    });
 
-  // update metrics
-  let rejected=0, shortages=0, newSchool=0, paid=0, part=0, notPaid=0;
-  snapshot.docs.forEach(doc=>{
-    const d=doc.data(); const s1=(d.status1||'').toLowerCase(); const s2=(d.status2||'').toLowerCase();
-    if(s1.includes('rejected')||s2.includes('rejected')) rejected++;
-    if(s1.includes('shortages')||s2.includes('shortages')) shortages++;
-    if(s1.includes('new')||s2.includes('new')) newSchool++;
-    if(s1.includes('paid')||s2.includes('paid')) paid++;
-    if(s1.includes('part payment')||s2.includes('part payment')) part++;
-    if(s1.includes('not paid')||s2.includes('not paid')) notPaid++;
-  });
-  document.getElementById('metricRejected').innerHTML=`Rejected: <b>${rejected}</b>`;
-  document.getElementById('metricShortages').innerHTML=`Shortages: <b>${shortages}</b>`;
-  document.getElementById('metricNew').innerHTML=`New Schools: <b>${newSchool}</b>`;
-  document.getElementById('metricPaid').innerHTML=`Paid: <b>${paid}</b>`;
-  document.getElementById('metricPart').innerHTML=`Part Payment: <b>${part}</b> / Not Paid: <b>${notPaid}</b>`;
+    // notif dropdown behavior
+    notifBtn.addEventListener('click', ()=>{
+      notifDropdown.classList.toggle('hidden');
+      if (!notifDropdown.classList.contains('hidden')) {
+        // mark seen
+        setLastSeen(Date.now());
+        notifBadge.textContent = '0';
+      }
+    });
 
-  // notif badge
-  notifBadge.textContent=snapshot.docs.length>0?snapshot.docs.length:'0';
+    // modal
+    function openModal(html){
+      document.getElementById('modalContent').innerHTML = html;
+      document.getElementById('detailModal').classList.remove('hidden');
+    }
+    document.getElementById('closeModal').addEventListener('click', ()=> document.getElementById('detailModal').classList.add('hidden'));
+
+
+
+
+// Map init (Leaflet) — Ghana-focused, bounded, limited zoom
+const ghanaCenter = [7.9465, -1.0232]; // Ghana center
+const ghanaBounds = L.latLngBounds([ [4.5, -3.5], [11.5, 1.5] ]); // SW, NE: soft Ghana bounds
+
+const map = L.map('map', {
+  preferCanvas: true,
+  zoomControl: true,
+  center: ghanaCenter,
+  zoom: 7,
+  minZoom: 6,    // prevent zooming out too far
+  maxZoom: 12,   // reasonable max zoom
+  maxBounds: ghanaBounds, // keep the map view inside Ghana
+  maxBoundsViscosity: 1.0 // strong clamp while panning
 });
 
-// ---------------------------
-// Search
-// ---------------------------
-document.getElementById('searchInput').addEventListener('input',e=>{
-  const q=e.target.value.toLowerCase();
-  document.querySelectorAll('.day-sheet div.grid > div').forEach(card=>{
-    const text=card.innerText.toLowerCase(); card.style.display=text.includes(q)?'':'none';
-  });
-});
+// Tiles
+const darkTiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const lightTiles = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+let tileLayer = L.tileLayer(document.documentElement.classList.contains('light') ? lightTiles : darkTiles, { maxZoom: 19 }).addTo(map);
 
-// ---------------------------
-// Status Filter
-// ---------------------------
-document.getElementById('statusFilter').addEventListener('change',()=>{
-  const filter=document.getElementById('statusFilter').value.toLowerCase();
-  document.querySelectorAll('.day-sheet div.grid > div').forEach(card=>{
-    const text=card.innerText.toLowerCase();
-    card.style.display=(filter==='all'||text.includes(filter))?'':'none';
-  });
-});
+// Layers
+const markersLayer = L.layerGroup().addTo(map);
+const regionLayer = L.layerGroup().addTo(map);
 
-// ---------------------------
-// CSV Export
-// ---------------------------
-document.getElementById('exportCsv').addEventListener('click', async ()=>{
-  const { getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-  const snapshot = await getDocs(collection(db,'parcels'));
-  const rows=[['id','name','address','phone','capturer','status1','status2','photoCount','timestamp']];
-  snapshot.forEach(doc=>{
-    const d=doc.data();
-    rows.push([doc.id,d.name||d.school||'',d.address||d.location||'',d.phone||d.contact||'',d.capturer||d.officer||'',d.status1||'',d.status2||'',d.photos?d.photos.length:0,formatTimestamp(d.timestamp)]);
-  });
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replaceAll('"','""')}"`).join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`parcels_export_${Date.now()}.csv`; a.click(); URL.revokeObjectURL(url);
-});
-</script>
+// Keep the map strictly inside Ghana bounds (extra safety)
+map.setMaxBounds(ghanaBounds);
+map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
+
+
+
+
+
+
+    // switch tile theme when site theme toggles
+    const themeObserver = new MutationObserver(()=> {
+      try { map.removeLayer(tileLayer); } catch(e){}
+      tileLayer = L.tileLayer(document.documentElement.classList.contains('light') ? lightTiles : darkTiles, { maxZoom:19 });
+      tileLayer.addTo(map);
+    });
+    themeObserver.observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
+
+    // helpers
+    function formatTimestamp(ts){
+      if(!ts) return '';
+      if (typeof ts.toDate === 'function') return ts.toDate().toLocaleString();
+      if (ts.seconds) return new Date(ts.seconds*1000).toLocaleString();
+      return new Date(ts).toLocaleString();
+    }
+    function esc(s){ return s==null?'':String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+    function badgesHtml(s1, s2) {
+      const a = [];
+      const s1l = String(s1||'').toLowerCase();
+      const s2l = String(s2||'').toLowerCase();
+      if (s1) {
+        if (s1l.includes('rejected')) a.push(`<span class="status-badge badge-rejected">Rejected</span>`);
+        else if (s1l.includes('short')) a.push(`<span class="status-badge badge-short">Shortages</span>`);
+        else if (s1l.includes('new')) a.push(`<span class="status-badge badge-new">New School</span>`);
+        else if (s1l.includes('part')) a.push(`<span class="status-badge badge-part">Part Payment</span>`);
+        else if (s1l.includes('paid') && !s1l.includes('part')) a.push(`<span class="status-badge badge-paid">Paid</span>`);
+        else if (s1l.includes('not paid')) a.push(`<span class="status-badge badge-not">Not Paid</span>`);
+        else a.push(`<span class="status-badge badge-not">${esc(s1)}</span>`);
+      }
+      if (s2) {
+        if (s2l.includes('rejected')) a.push(`<span class="status-badge badge-rejected">Rejected</span>`);
+        else if (s2l.includes('short')) a.push(`<span class="status-badge badge-short">Shortages</span>`);
+        else if (s2l.includes('new')) a.push(`<span class="status-badge badge-new">New School</span>`);
+        else if (s2l.includes('part')) a.push(`<span class="status-badge badge-part">Part Payment</span>`);
+        else if (s2l.includes('paid') && !s2l.includes('part')) a.push(`<span class="status-badge badge-paid">Paid</span>`);
+        else if (s2l.includes('not paid')) a.push(`<span class="status-badge badge-not">Not Paid</span>`);
+        else a.push(`<span class="status-badge badge-not">${esc(s2)}</span>`);
+      }
+      if (!s1 && !s2) a.push(`<span class="status-badge badge-not">Pending</span>`);
+      return a.join('');
+    }
+
+    // create parcel card element (used both in latest box and parcels page)
+    function makeParcelCard(d){
+      const root = document.createElement('div');
+      root.className = 'parcel-card p-3 rounded-lg bg-[rgba(255,255,255,0.02)] border border-white/6';
+      root.dataset.id = d.id;
+      root.dataset.status1 = (d.status1||'').toLowerCase();
+      root.dataset.status2 = (d.status2||'').toLowerCase();
+      root.innerHTML = `
+        <div class="flex justify-between">
+          <div>
+            <div class="font-semibold">${esc(d.name||d.school||'Unnamed')}</div>
+            <div class="text-xs muted">${esc(d.address||d.location||'')}</div>
+            <div class="text-xs muted mt-1">📞 ${esc(d.phone||d.contact||'')}</div>
+            <div class="text-xs muted mt-1">${formatTimestamp(d.timestamp)}</div>
+            <div class="mt-2">${badgesHtml(d.status1, d.status2)}</div>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            <button class="view-btn px-3 py-1 rounded bg-[rgba(59,130,246,0.9)] text-white text-sm">View</button>
+            <div class="text-xs muted">${esc(d.capturer||d.officer||'')}</div>
+          </div>
+        </div>
+      `;
+      root.querySelector('.view-btn').addEventListener('click', ()=>{
+        const photos = (d.photos||[]).map(u=>`<img src="${esc(u)}" class="w-48 h-28 object-cover rounded mr-2">`).join('') || '<div class="text-xs muted">No images</div>';
+        openModal(`
+          <div class="mb-3 flex gap-2 overflow-x-auto">${photos}</div>
+          <p><b>Name:</b> ${esc(d.name||'')}</p>
+          <p><b>Address:</b> ${esc(d.address||'')}</p>
+          <p><b>Phone:</b> ${esc(d.phone||'')}</p>
+          <p><b>Captured by:</b> ${esc(d.capturer||'')}</p>
+          <div class="mt-2">${badgesHtml(d.status1, d.status2)}</div>
+          <p class="text-xs muted mt-2">Doc ID: ${d.id}</p>
+        `);
+      });
+      return root;
+    }
+
+    // highlight and scroll to a card (used when clicking a notification)
+    function highlightCard(docId){
+      const els = Array.from(document.querySelectorAll(`.parcel-card[data-id="${docId}"]`));
+      if (!els.length) return;
+      const el = els[0];
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('highlight');
+      setTimeout(()=> el.classList.remove('highlight'), 2200);
+    }
+
+    // real-time listener
+    const q = query(collection(db,'parcels'), orderBy('timestamp','desc'));
+    onSnapshot(q, snapshot => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // counters
+      let rejected=0, shortages=0, newSchool=0, paid=0, part=0, notPaid=0;
+      let today=0, yesterday=0, older=0;
+      const now = new Date();
+      const startToday = new Date(); startToday.setHours(0,0,0,0);
+      const startYesterday = new Date(startToday); startYesterday.setDate(startToday.getDate()-1);
+
+      // map cleanup
+      markersLayer.clearLayers();
+      regionLayer.clearLayers();
+
+      // notifications build
+      notifList.innerHTML = '';
+
+      const regionAgg = {};
+      let unreadCount = 0;
+
+      // Build latest list and notif list
+      latestList.innerHTML = '';
+      docs.forEach(d => {
+        // counts for time buckets
+        const ts = d.timestamp?.seconds ? new Date(d.timestamp.seconds*1000) : new Date();
+        if (ts >= startToday) today++; else if (ts >= startYesterday) yesterday++; else older++;
+
+        const s1 = String(d.status1||'').toLowerCase();
+        const s2 = String(d.status2||'').toLowerCase();
+        if (s1.includes('rejected') || s2.includes('rejected')) rejected++;
+        if (s1.includes('short') || s2.includes('short')) shortages++;
+        if (s1.includes('new') || s2.includes('new')) newSchool++;
+        if ((s1.includes('paid') && !s1.includes('part')) || (s2.includes('paid') && !s2.includes('part'))) paid++;
+        if (s1.includes('part') || s2.includes('part')) part++;
+        if (s1.includes('not paid') || s2.includes('not paid')) notPaid++;
+
+        // latest list card
+        latestList.appendChild(makeParcelCard(d));
+
+        // notifications: unread since lastSeen -> list item clickable
+        const lastSeen = getLastSeen();
+        const timeMs = d.timestamp?.seconds ? d.timestamp.seconds*1000 : Date.now();
+        if (timeMs > lastSeen) {
+          unreadCount++;
+          const li = document.createElement('li');
+          li.className = 'p-2 rounded hover:bg-[rgba(255,255,255,0.02)] cursor-pointer';
+          li.innerHTML = `<div class="font-semibold">${esc(d.name||'Parcel')}</div><div class="text-xs muted">${esc(d.status1||d.status2||'Pending')}</div>`;
+          li.addEventListener('click', ()=>{
+            // navigate to Parcels page, open modal, highlight card
+            document.querySelectorAll('.nav-btn').forEach(n=>n.classList.remove('bg-[rgba(59,130,246,0.14)]'));
+            document.querySelector('.nav-btn[data-page="parcels"]').classList.add('bg-[rgba(59,130,246,0.14)]');
+            Object.values(pages).forEach(p=>p.classList.add('hidden'));
+            pages.parcels.classList.remove('hidden');
+
+            // ensure Parcels tabs are built already (they are built below in this same snapshot)
+            openModal(`<p><b>Name:</b> ${esc(d.name||'')}</p><p><b>Address:</b> ${esc(d.address||'')}</p><p class="text-xs muted mt-2">Doc ID: ${d.id}</p>`);
+            // wait a tick so the parcels DOM is in place then highlight
+            setTimeout(()=> highlightCard(d.id), 200);
+          });
+          notifList.appendChild(li);
+        }
+
+
+        
+
+        // map markers & region aggregation
+        if (typeof d.lat === 'number' && typeof d.lng === 'number') {
+          const m = L.marker([d.lat, d.lng]);
+          m.bindPopup(`<b>${esc(d.name||'Parcel')}</b><br>${esc(d.address||'')}`);
+          markersLayer.addLayer(m);
+
+          const r = (d.region || d.state || d.country || 'Unknown').toString();
+          if (!regionAgg[r]) regionAgg[r] = { count:0, latSum:0, lngSum:0 };
+          regionAgg[r].count++;
+          regionAgg[r].latSum += d.lat;
+          regionAgg[r].lngSum += d.lng;
+        }
+      });
+
+      // map bounds / region circles
+      try {
+        if (markersLayer.getLayers().length) map.fitBounds(markersLayer.getBounds().pad(0.15));
+        else map.setView([6.5,0], 2);
+      } catch(e) { map.setView([6.5,0], 2); }
+
+      for (const r in regionAgg) {
+        const ag = regionAgg[r];
+        const lat = ag.latSum/ag.count, lng = ag.lngSum/ag.count;
+        const circle = L.circle([lat, lng], { radius: 20000 + ag.count*7000, color:'#8B5CF6', fillColor:'#3B82F6', fillOpacity:0.18 });
+        circle.bindPopup(`<b>${esc(r)}</b><br>Count: ${ag.count}`);
+        regionLayer.addLayer(circle);
+      }
+
+
+
+
+
+      // update UI counters
+      document.getElementById('metricRejected').textContent = rejected;
+      document.getElementById('metricShortages').textContent = shortages;
+      document.getElementById('metricNew').textContent = newSchool;
+      document.getElementById('metricPaid').textContent = paid;
+
+      // mini bars
+      const maxPeriod = Math.max(1, today, yesterday, older);
+      document.getElementById('barToday').style.width = (today/maxPeriod*100)+'%';
+      document.getElementById('barYesterday').style.width = (yesterday/maxPeriod*100)+'%';
+      document.getElementById('barOlder').style.width = (older/maxPeriod*100)+'%';
+
+      const maxStatus = Math.max(1, rejected, shortages, paid);
+      document.getElementById('barRejected').style.width = (rejected/maxStatus*100)+'%';
+      document.getElementById('barShortages').style.width = (shortages/maxStatus*100)+'%';
+      document.getElementById('barPaid').style.width = (paid/maxStatus*100)+'%';
+
+      // pie payment
+      const totalPay = Math.max(1, paid + part + notPaid);
+      const paidPct = Math.round((paid/totalPay)*100);
+      const partPct = Math.round((part/totalPay)*100);
+      const notPct = 100 - paidPct - partPct;
+      piePayment.style.background = `conic-gradient(#10B981 0% ${paidPct}%, #FB923C ${paidPct}% ${paidPct+partPct}%, #6B7280 ${paidPct+partPct}% 100%)`;
+      paidPctEl.textContent = paidPct + '%';
+      partPctEl.textContent = partPct + '%';
+      notPctEl.textContent = notPct + '%';
+
+      // notif badge
+      notifBadge.textContent = unreadCount;
+
+      // region summary list
+      regionSummaryEl.innerHTML = '';
+      Object.keys(regionAgg).sort((a,b)=>regionAgg[b].count-regionAgg[a].count).forEach(r=>{
+        const el = document.createElement('div');
+        el.className = 'flex items-center justify-between text-sm';
+        el.innerHTML = `<div>${esc(r)}</div><div class="font-semibold">${regionAgg[r].count}</div>`;
+        regionSummaryEl.appendChild(el);
+      });
+
+      // map counters
+      mapCountEl.textContent = markersLayer.getLayers().length;
+      regionCountEl.textContent = Object.keys(regionAgg).length;
+
+      // build Parcels page tabs & sheets (today/yesterday/older)
+      const tabsContainer = document.getElementById('parcelsTabs');
+      const sheetsContainer = document.getElementById('parcelsSheets');
+      tabsContainer.innerHTML = '';
+      sheetsContainer.innerHTML = '';
+
+      const grouped = [];
+      grouped.push({ key:'today', label:'Today', items: docs.filter(d => (d.timestamp?.seconds ? new Date(d.timestamp.seconds*1000) : new Date()) >= startToday) });
+      grouped.push({ key:'yesterday', label:'Yesterday', items: docs.filter(d => {
+        const ts = d.timestamp?.seconds ? new Date(d.timestamp.seconds*1000) : new Date();
+        return ts >= startYesterday && ts < startToday;
+      }) });
+      // older grouped by date
+      const olderByDate = {};
+      docs.forEach(d => {
+        const ts = d.timestamp?.seconds ? new Date(d.timestamp.seconds*1000) : new Date();
+        if (ts < startYesterday) {
+          const key = ts.toISOString().split('T')[0];
+          if (!olderByDate[key]) olderByDate[key]=[];
+          olderByDate[key].push(d);
+        }
+      });
+      Object.keys(olderByDate).sort((a,b)=>b.localeCompare(a)).forEach(k=> grouped.push({ key:k, label:k, items: olderByDate[k] }));
+
+      grouped.forEach((g, idx) => {
+        const tab = document.createElement('button');
+        tab.textContent = g.label;
+        tab.className = `px-3 py-1 rounded ${idx===0 ? 'bg-blue-600 text-white' : 'bg-white/5'}`;
+        tab.addEventListener('click', ()=>{
+          document.querySelectorAll('.day-sheet').forEach(s=> s.classList.add('hidden'));
+          document.getElementById('sheet-'+g.key).classList.remove('hidden');
+          tabsContainer.querySelectorAll('button').forEach(b=> b.className='px-3 py-1 rounded bg-white/5');
+          tab.className = 'px-3 py-1 rounded bg-blue-600 text-white';
+        });
+        tabsContainer.appendChild(tab);
+
+        const sheet = document.createElement('div');
+        sheet.id = 'sheet-'+g.key;
+        sheet.className = 'day-sheet ' + (idx===0?'':'hidden');
+
+        if (!g.items.length) {
+          const none = document.createElement('div'); none.className='p-3 muted'; none.textContent='No entries.'; sheet.appendChild(none);
+        } else {
+          // grid container to make cards side-by-side
+          const grid = document.createElement('div');
+          grid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3';
+          g.items.forEach(d => grid.appendChild(makeParcelCard(d)));
+          sheet.appendChild(grid);
+        }
+        sheetsContainer.appendChild(sheet);
+      });
+
+    }); // end onSnapshot
+
+    // CSV Export
+    document.getElementById('exportCsv').addEventListener('click', async ()=>{
+      const snap = await getDocs(collection(db,'parcels'));
+      const rows = [['id','name','address','phone','capturer','status1','status2','photoCount','timestamp','lat','lng','region']];
+      snap.forEach(doc=>{
+        const d = doc.data();
+        rows.push([
+          doc.id,
+          d.name||'',
+          d.address||'',
+          d.phone||'',
+          d.capturer||'',
+          d.status1||'',
+          d.status2||'',
+          Array.isArray(d.photos)? d.photos.length : (d.photoCount ?? 0),
+          formatTimestamp(d.timestamp),
+          d.lat ?? '',
+          d.lng ?? '',
+          d.region ?? d.state ?? d.country ?? ''
+        ]);
+      });
+      const csv = rows.map(r=> r.map(c=> `"${String(c).replaceAll('"','""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type:'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `parcels_export_${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Search & Status filter (client-side)
+    searchInput.addEventListener('input', ()=>{
+      const q = searchInput.value.trim().toLowerCase();
+      document.querySelectorAll('.parcel-card').forEach(el=>{
+        el.style.display = el.innerText.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+
+    statusFilter.addEventListener('change', ()=>{
+      const f = statusFilter.value.toLowerCase();
+      document.querySelectorAll('.parcel-card').forEach(el=>{
+        const s1 = (el.dataset.status1||'').toLowerCase();
+        const s2 = (el.dataset.status2||'').toLowerCase();
+        let ok = false;
+        if (f === 'all') ok = true;
+        else if (f === 'paid') ok = ((s1.includes('paid') && !s1.includes('part')) || (s2.includes('paid') && !s2.includes('part')));
+        else if (f === 'part payment') ok = (s1.includes('part') || s2.includes('part'));
+        else if (f === 'not paid') ok = (s1.includes('not paid') || s2.includes('not paid'));
+        else ok = (s1.includes(f) || s2.includes(f) || el.innerText.toLowerCase().includes(f));
+        el.style.display = ok ? '' : 'none';
+      });
+    });
+
+    // Mobile sidebar toggle
+    document.getElementById('mobileOpen').addEventListener('click', ()=>{
+      const side = document.querySelector('aside');
+      side.style.display = side.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // set lastSeen on page load if not set (so existing items considered read)
+    if (!localStorage.getItem(lastSeenKey)) setLastSeen(Date.now());
+  </script>
 </body>
 </html>
