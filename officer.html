@@ -29,8 +29,8 @@
       </div>
       <!-- Profile -->
       <div class="flex items-center gap-2">
-        <span class="hidden sm:block font-medium">Officer</span>
-        <img src="https://via.placeholder.com/32" alt="profile" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-blue-600">
+        <span class="hidden sm:block font-medium" id="profileName">Officer</span>
+        <img src="https://via.placeholder.com/32" alt="profile" id="profileImg" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-blue-600">
       </div>
     </div>
   </header>
@@ -62,20 +62,10 @@
     </div>
 
     <!-- Day Sheets -->
-    <div id="daySheets" class="flex-1 overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow p-3 sm:p-4 transition text-xs sm:text-sm">
-      <div id="sheet-today" class="day-sheet">
-        <h2 class="text-sm sm:text-lg font-semibold mb-2 sm:mb-3">Today</h2>
-        <div id="parcelList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4"></div>
-      </div>
-      <!-- optional other sheets (yesterday, older) can be added similarly -->
-    </div>
+    <div id="daySheets" class="flex-1 overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow p-3 sm:p-4 transition text-xs sm:text-sm"></div>
 
     <!-- Sheet Tabs -->
-    <div class="flex gap-2 mt-3 sm:mt-4 overflow-x-auto border-t pt-2 dark:border-gray-700 text-xs sm:text-sm">
-      <button onclick="showSheet('today')" class="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md">Today</button>
-      <button onclick="showSheet('yesterday')" class="px-3 sm:px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">Yesterday</button>
-      <button onclick="showSheet('older')" class="px-3 sm:px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">Older</button>
-    </div>
+    <div id="tabsContainer" class="flex gap-2 mt-3 sm:mt-4 overflow-x-auto border-t pt-2 dark:border-gray-700 text-xs sm:text-sm"></div>
   </main>
 
   <!-- Modal -->
@@ -87,247 +77,178 @@
     </div>
   </div>
 
-  <footer class="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 p-3 sm:p-4 text-center text-xs sm:text-sm">Parcel Officer Dashboard • TailwindCSS</footer>
+  <footer class="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 p-3 sm:p-4 text-center text-xs sm:text-sm">Parcel Officer Dashboard • Designed by Nicholas</footer>
 
 <script type="module">
-  // Firebase (matches the config you provided)
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // ---------------------------
-  // UI helpers (theme, modal, sheets)
-  // ---------------------------
-  const toggle = document.getElementById('themeToggle');
-  if (toggle) {
-    toggle.addEventListener('click', () => {
-      document.documentElement.classList.toggle('dark');
-      toggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
-    });
-  }
+// ---------------------------
+// UI helpers
+// ---------------------------
+const toggle=document.getElementById('themeToggle');
+toggle.addEventListener('click',()=>{document.documentElement.classList.toggle('dark'); toggle.textContent=document.documentElement.classList.contains('dark')?'☀️':'🌙';});
+window.openModal=html=>{document.getElementById('modalContent').innerHTML=html; document.getElementById('detailModal').classList.remove('hidden');};
+window.closeModal=()=>{document.getElementById('detailModal').classList.add('hidden');};
+window.showSheet=id=>{
+  document.querySelectorAll('.day-sheet').forEach(s=>s.classList.add('hidden'));
+  const active=document.getElementById('sheet-'+id);
+  if(active) active.classList.remove('hidden');
+};
 
-  window.openModal = function (html) {
-    document.getElementById('modalContent').innerHTML = html;
-    document.getElementById('detailModal').classList.remove('hidden');
-  };
-  window.closeModal = function () {
-    document.getElementById('detailModal').classList.add('hidden');
-  };
+// ---------------------------
+// Firebase init
+// ---------------------------
+const firebaseConfig={
+  apiKey:"AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
+  authDomain:"employee-app-c781d.firebaseapp.com",
+  projectId:"employee-app-c781d",
+  storageBucket:"employee-app-c781d.appspot.com",
+  messagingSenderId:"232631444018",
+  appId:"1:232631444018:web:37b70fe37975abcc1b922b"
+};
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
 
-  window.showSheet = function (id) {
-    document.querySelectorAll('.day-sheet').forEach(sheet => sheet.classList.add('hidden'));
-    const active = document.getElementById('sheet-' + id);
-    if (active) active.classList.remove('hidden');
-  };
+// ---------------------------
+// Helpers
+// ---------------------------
+function formatTimestamp(ts){if(!ts)return''; if(typeof ts.toDate==='function')return ts.toDate().toLocaleString(); if(ts.seconds)return new Date(ts.seconds*1000).toLocaleString(); try{return new Date(ts).toLocaleString()}catch{return''}}
+function createBadge(text,colorClass='bg-green-200 text-green-800'){return`<span class="px-2 py-1 text-xs rounded-full ${colorClass} dark:bg-opacity-80">${text}</span>`;}
+function escapeHtml(unsafe){if(unsafe===null||unsafe===undefined)return''; return String(unsafe).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
 
-  // notif dropdown toggle
-  const notifBtn = document.getElementById('notifBtn');
-  const notifDropdown = document.getElementById('notifDropdown');
-  const notifListEl = document.getElementById('notifList');
-  const notifBadge = document.getElementById('notifBadge');
-  if (notifBtn) notifBtn.addEventListener('click', () => notifDropdown.classList.toggle('hidden'));
+// ---------------------------
+// Realtime listener
+// ---------------------------
+const notifBtn=document.getElementById('notifBtn');
+const notifDropdown=document.getElementById('notifDropdown');
+const notifListEl=document.getElementById('notifList');
+const notifBadge=document.getElementById('notifBadge');
 
-  // ---------------------------
-  // Firebase initialization
-  // ---------------------------
-  const firebaseConfig = {
-    apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
-    authDomain: "employee-app-c781d.firebaseapp.com",
-    projectId: "employee-app-c781d",
-    storageBucket: "employee-app-c781d.appspot.com",
-    messagingSenderId: "232631444018",
-    appId: "1:232631444018:web:37b70fe37975abcc1b922b"
-  };
+notifBtn.addEventListener('click',()=>{notifDropdown.classList.toggle('hidden'); if(notifDropdown.classList.contains('hidden')) notifBadge.textContent='0';});
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // ---------------------------
-  // Helpers
-  // ---------------------------
-  function formatTimestamp(ts) {
-    if (!ts) return '';
-    // Firestore Timestamp object
-    if (typeof ts.toDate === 'function') {
-      return ts.toDate().toLocaleString();
+const parcelsQuery=query(collection(db,'parcels'),orderBy('timestamp','desc'));
+onSnapshot(parcelsQuery,snapshot=>{
+  // organize parcels by date
+  const today=new Date(); today.setHours(0,0,0,0);
+  const yesterday=new Date(today); yesterday.setDate(today.getDate()-1);
+  const older={}; const byDate={today:[], yesterday:[]};
+  snapshot.docs.forEach(doc=>{
+    const data=doc.data();
+    const ts=data.timestamp?new Date(data.timestamp.seconds*1000):new Date();
+    ts.setHours(0,0,0,0);
+    const diff=(today-ts)/(1000*60*60*24);
+    if(diff<1) byDate.today.push({...data,id:doc.id});
+    else if(diff<2) byDate.yesterday.push({...data,id:doc.id});
+    else{
+      const dStr=ts.toISOString().split('T')[0];
+      if(!older[dStr]) older[dStr]=[];
+      older[dStr].push({...data,id:doc.id});
     }
-    // If it's seconds/nanos object
-    if (ts.seconds) {
-      return new Date(ts.seconds * 1000).toLocaleString();
-    }
-    // string or number fallback
-    try { return new Date(ts).toLocaleString(); } catch { return ''; }
-  }
+  });
 
-  function createBadge(text, colorClass = 'bg-green-200 text-green-800') {
-    return `<span class="px-2 py-1 text-xs rounded-full ${colorClass} dark:bg-opacity-80">${text}</span>`;
-  }
+  // build tabs
+  const daySheets=document.getElementById('daySheets');
+  const tabsContainer=document.getElementById('tabsContainer');
+  daySheets.innerHTML=''; tabsContainer.innerHTML='';
+  const allDates=[{key:'today',label:'Today',parcels:byDate.today},{key:'yesterday',label:'Yesterday',parcels:byDate.yesterday}];
+  Object.keys(older).sort().forEach(k=>allDates.push({key:k,label:k,parcels:older[k]}));
 
-  // ---------------------------
-  // Real-time listener
-  // ---------------------------
-  const parcelList = document.getElementById("parcelList");
-  const q = query(collection(db, "parcels"), orderBy("timestamp", "desc"));
-
-  // Keep simple metrics counting
-  function updateMetrics(docs) {
-    let rejected=0, shortages=0, newSchool=0, paid=0, part=0, notPaid=0;
-    docs.forEach(d => {
-      const data = d.data();
-      const s1 = (data.status1 || '').toLowerCase();
-      const s2 = (data.status2 || '').toLowerCase();
-      if (s1.includes('rejected') || s2.includes('rejected')) rejected++;
-      if (s1.includes('shortages') || s2.includes('shortages')) shortages++;
-      if (s1.includes('new') || s2.includes('new')) newSchool++;
-      if (s2.includes('paid') || s1.includes('paid')) paid += (data.photoCount?0:0); // keep simple
-      if (s2.includes('part payment') || s1.includes('part payment')) part++;
-      if (s2.includes('not paid') || s1.includes('not paid')) notPaid++;
-    });
-    document.getElementById('metricRejected').innerHTML = `Rejected: <b>${rejected}</b>`;
-    document.getElementById('metricShortages').innerHTML = `Shortages: <b>${shortages}</b>`;
-    document.getElementById('metricNew').innerHTML = `New Schools: <b>${newSchool}</b>`;
-    document.getElementById('metricPaid').innerHTML = `Paid: <b>${paid}</b>`;
-    document.getElementById('metricPart').innerHTML = `Part Payment: <b>${part}</b> / Not Paid: <b>${notPaid}</b>`;
-  }
-
-  // Build card and modal content safely
-  onSnapshot(q, (snapshot) => {
-    // update notifications & metrics
-    updateMetrics(snapshot.docs);
-
-    // show notification badge = number of new docs in the snapshot (simple)
-    const newCount = snapshot.docs.length;
-    notifBadge.textContent = newCount > 0 ? String(newCount) : "0";
-
-    parcelList.innerHTML = "";
-    notifListEl.innerHTML = "";
-
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-
-      // normalize fields (capture page uses name/address/phone/capturer)
-      const title = data.name || data.school || 'Unnamed Parcel';
-      const location = data.address || data.location || '';
-      const contact = data.phone || data.contact || '';
-      const capturer = data.capturer || data.officer || '';
-      const photos = Array.isArray(data.photos) ? data.photos : [];
-      const photoCount = data.photoCount || photos.length || 0;
-      const tsText = formatTimestamp(data.timestamp);
-      const statusText = [data.status1, data.status2].filter(Boolean).join(' • ') || (data.status || 'Pending');
-
-      // small image strip (limit to 3)
-      const imagesHtml = photos.length > 0
-        ? photos.slice(0,3).map(url => `<img src="${url}" class="w-40 h-28 object-cover rounded-md">`).join('')
-        : `<img src="https://via.placeholder.com/400x200" class="w-40 h-28 object-cover rounded-md">`;
-
-      // create card
-      const card = document.createElement("div");
-      card.className = "bg-gray-50 dark:bg-gray-700 p-3 sm:p-4 rounded-xl shadow hover:shadow-lg transition";
-
-      card.innerHTML = `
-        <div class="flex gap-2 overflow-x-auto mb-2 sm:mb-3">${imagesHtml}</div>
-        <h3 class="font-semibold text-sm sm:text-base">${escapeHtml(title)}</h3>
-        <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">${escapeHtml(location)}</p>
-        <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Contact: ${escapeHtml(contact)}</p>
-        <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Captured by: ${escapeHtml(capturer)} ${tsText ? ' at ' + tsText : ''}</p>
-        <div class="flex flex-wrap gap-2 mt-2">
-          ${createBadge(escapeHtml(statusText))}
-        </div>
-        <div class="flex flex-wrap gap-2 mt-3">
-          <button class="view-btn px-3 py-1 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">View</button>
-        </div>
-      `;
-
-      // append card
-      parcelList.appendChild(card);
-
-      // add to notifications list
-      const notifItem = document.createElement('li');
-      notifItem.className = 'p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700';
-      notifItem.textContent = `${title} — ${statusText || 'Pending'}`;
-      notifListEl.appendChild(notifItem);
-
-      // view button handler -> open modal with full details
-      const viewBtn = card.querySelector('.view-btn');
-      viewBtn.addEventListener('click', () => {
-        const photosHtmlFull = photos.length > 0
-          ? photos.map(url => `<img src="${url}" class="w-48 h-32 object-cover rounded-md">`).join('')
-          : `<img src="https://via.placeholder.com/500x300" class="w-48 h-32 object-cover rounded-md">`;
-
-        const modalHtml = `
-          <div class="flex gap-2 overflow-x-auto mb-3">${photosHtmlFull}</div>
-          <p><b>Name:</b> ${escapeHtml(title)}</p>
-          <p><b>Address:</b> ${escapeHtml(location)}</p>
-          <p><b>Phone:</b> ${escapeHtml(contact)}</p>
-          <p><b>Captured by:</b> ${escapeHtml(capturer)} ${tsText ? ' at ' + tsText : ''}</p>
+  allDates.forEach((day,i)=>{
+    const sheet=document.createElement('div');
+    sheet.className='day-sheet '+(i>0?'hidden':''); sheet.id='sheet-'+day.key;
+    const h=document.createElement('h2'); h.className='text-sm sm:text-lg font-semibold mb-2 sm:mb-3'; h.textContent=day.label; sheet.appendChild(h);
+    const grid=document.createElement('div'); grid.className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4';
+    day.parcels.forEach(d=>{
+      const photos=(d.photos||[]).slice(0,3).map(u=>`<img src="${u}" class="w-40 h-28 object-cover rounded-md">`).join('')||'<img src="https://via.placeholder.com/400x200" class="w-40 h-28 object-cover rounded-md">';
+      const statusText=[d.status1,d.status2].filter(Boolean).join(' • ')||'Pending';
+      const card=document.createElement('div'); card.className='bg-gray-50 dark:bg-gray-700 p-3 sm:p-4 rounded-xl shadow hover:shadow-lg transition';
+      card.innerHTML=`<div class="flex gap-2 overflow-x-auto mb-2 sm:mb-3">${photos}</div>
+      <h3 class="font-semibold text-sm sm:text-base">${escapeHtml(d.name||d.school||'Unnamed Parcel')}</h3>
+      <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">${escapeHtml(d.address||d.location||'')}</p>
+      <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Contact: ${escapeHtml(d.phone||d.contact||'')}</p>
+      <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Captured by: ${escapeHtml(d.capturer||d.officer||'')} ${d.timestamp? ' at ' + formatTimestamp(d.timestamp):''}</p>
+      <div class="flex flex-wrap gap-2 mt-2">${createBadge(statusText)}</div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <button class="view-btn px-3 py-1 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">View</button>
+      </div>`;
+      card.querySelector('.view-btn').addEventListener('click',()=>{
+        const fullPhotos=(d.photos||[]).map(u=>`<img src="${u}" class="w-48 h-32 object-cover rounded-md">`).join('')||'<img src="https://via.placeholder.com/500x300" class="w-48 h-32 object-cover rounded-md">';
+        openModal(`<div class="flex gap-2 overflow-x-auto mb-3">${fullPhotos}</div>
+          <p><b>Name:</b> ${escapeHtml(d.name||d.school||'')}</p>
+          <p><b>Address:</b> ${escapeHtml(d.address||d.location||'')}</p>
+          <p><b>Phone:</b> ${escapeHtml(d.phone||d.contact||'')}</p>
+          <p><b>Captured by:</b> ${escapeHtml(d.capturer||d.officer||'')} ${d.timestamp? ' at ' + formatTimestamp(d.timestamp):''}</p>
           <p><b>Status:</b> ${escapeHtml(statusText)}</p>
-          <p><b>Photos:</b> ${photoCount}</p>
-          <p class="text-xs text-gray-500 mt-2">Doc ID: ${doc.id}</p>
-        `;
-        openModal(modalHtml);
+          <p><b>Photos:</b> ${(d.photos||[]).length}</p>
+          <p class="text-xs text-gray-500 mt-2">Doc ID: ${d.id}</p>`);
       });
+      grid.appendChild(card);
+
+      // add to notification
+      const notifItem=document.createElement('li'); notifItem.className='p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700'; notifItem.textContent=`${d.name||d.school||'Parcel'} — ${statusText}`; notifListEl.appendChild(notifItem);
     });
+    sheet.appendChild(grid); daySheets.appendChild(sheet);
+
+    const tab=document.createElement('button'); tab.className='px-3 sm:px-4 py-2 rounded-md '+(i===0?'bg-blue-600 text-white':'bg-gray-200 dark:bg-gray-700'); tab.textContent=day.label; tab.addEventListener('click',()=>showSheet(day.key)); tabsContainer.appendChild(tab);
   });
 
-  // very small helper to avoid accidental raw HTML injection in text fields
-  function escapeHtml(unsafe) {
-    if (unsafe === null || unsafe === undefined) return '';
-    return String(unsafe)
-      .replaceAll('&','&amp;')
-      .replaceAll('<','&lt;')
-      .replaceAll('>','&gt;')
-      .replaceAll('"','&quot;')
-      .replaceAll("'",'&#039;');
-  }
-
-  // ---------------------------
-  // CSV Export (simple)
-  // ---------------------------
-  document.getElementById('exportCsv').addEventListener('click', async () => {
-    // quick export: fetch all parcels once (not realtime)
-    const snapshot = await (await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js")).getDocs(collection(db, 'parcels'));
-    const rows = [['id','name','address','phone','capturer','status1','status2','photoCount','timestamp']];
-    snapshot.forEach(doc => {
-      const d = doc.data();
-      rows.push([
-        doc.id,
-        d.name || d.school || '',
-        d.address || d.location || '',
-        d.phone || d.contact || '',
-        d.capturer || d.officer || '',
-        d.status1 || '',
-        d.status2 || '',
-        d.photoCount || 0,
-        formatTimestamp(d.timestamp)
-      ]);
-    });
-    const csv = rows.map(r => r.map(cell => `"${String(cell).replaceAll('"','""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `parcels_export_${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // update metrics
+  let rejected=0, shortages=0, newSchool=0, paid=0, part=0, notPaid=0;
+  snapshot.docs.forEach(doc=>{
+    const d=doc.data(); const s1=(d.status1||'').toLowerCase(); const s2=(d.status2||'').toLowerCase();
+    if(s1.includes('rejected')||s2.includes('rejected')) rejected++;
+    if(s1.includes('shortages')||s2.includes('shortages')) shortages++;
+    if(s1.includes('new')||s2.includes('new')) newSchool++;
+    if(s1.includes('paid')||s2.includes('paid')) paid++;
+    if(s1.includes('part payment')||s2.includes('part payment')) part++;
+    if(s1.includes('not paid')||s2.includes('not paid')) notPaid++;
   });
+  document.getElementById('metricRejected').innerHTML=`Rejected: <b>${rejected}</b>`;
+  document.getElementById('metricShortages').innerHTML=`Shortages: <b>${shortages}</b>`;
+  document.getElementById('metricNew').innerHTML=`New Schools: <b>${newSchool}</b>`;
+  document.getElementById('metricPaid').innerHTML=`Paid: <b>${paid}</b>`;
+  document.getElementById('metricPart').innerHTML=`Part Payment: <b>${part}</b> / Not Paid: <b>${notPaid}</b>`;
 
-  // ---------------------------
-  // Optional: simple search filter (client-side)
-  // ---------------------------
-  const searchInput = document.getElementById('searchInput');
-  let searchTimeout = null;
-  searchInput.addEventListener('input', () => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      // simple client-side filter: hide cards that don't match query
-      const q = searchInput.value.trim().toLowerCase();
-      document.querySelectorAll('#parcelList > div').forEach(card => {
-        if (!q) { card.style.display = ''; return; }
-        const text = card.innerText.toLowerCase();
-        card.style.display = text.includes(q) ? '' : 'none';
-      });
-    }, 250);
+  // notif badge
+  notifBadge.textContent=snapshot.docs.length>0?snapshot.docs.length:'0';
+});
+
+// ---------------------------
+// Search
+// ---------------------------
+document.getElementById('searchInput').addEventListener('input',e=>{
+  const q=e.target.value.toLowerCase();
+  document.querySelectorAll('.day-sheet div.grid > div').forEach(card=>{
+    const text=card.innerText.toLowerCase(); card.style.display=text.includes(q)?'':'none';
   });
+});
 
+// ---------------------------
+// Status Filter
+// ---------------------------
+document.getElementById('statusFilter').addEventListener('change',()=>{
+  const filter=document.getElementById('statusFilter').value.toLowerCase();
+  document.querySelectorAll('.day-sheet div.grid > div').forEach(card=>{
+    const text=card.innerText.toLowerCase();
+    card.style.display=(filter==='all'||text.includes(filter))?'':'none';
+  });
+});
+
+// ---------------------------
+// CSV Export
+// ---------------------------
+document.getElementById('exportCsv').addEventListener('click', async ()=>{
+  const { getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+  const snapshot = await getDocs(collection(db,'parcels'));
+  const rows=[['id','name','address','phone','capturer','status1','status2','photoCount','timestamp']];
+  snapshot.forEach(doc=>{
+    const d=doc.data();
+    rows.push([doc.id,d.name||d.school||'',d.address||d.location||'',d.phone||d.contact||'',d.capturer||d.officer||'',d.status1||'',d.status2||'',d.photos?d.photos.length:0,formatTimestamp(d.timestamp)]);
+  });
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replaceAll('"','""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`parcels_export_${Date.now()}.csv`; a.click(); URL.revokeObjectURL(url);
+});
 </script>
 </body>
 </html>
