@@ -64,8 +64,17 @@
     }
     .select-light { background: white; color: #0b1222; }
     .select-dark { background: rgba(255,255,255,0.02); color: #e6eef8; }
+
+
+    
   </style>
+
+  <link rel="icon" href="/favicon (1).ico" type="image/x-icon">
+<link rel="shortcut icon" href="/favicon (1).ico" type="image/x-icon">
+
 </head>
+
+
 <body class="min-h-screen">
 
   <!-- Sidebar -->
@@ -87,6 +96,13 @@
       
       <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="reports">📈 Reports</button>
       <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="settings">⚙️ Settings</button>
+      <!-- <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="settings">⚙️ Logout</button> -->
+   
+<button id="logoutBtn" type="button" 
+  class="fixed bottom-4 left-4 z-[9999] bg-blue-700 text-white px-4 py-2 rounded-xl">
+  Logout
+</button>
+
     </nav>
 
     <div class="mt-6 p-3 rounded-lg glass text-xs muted">
@@ -131,7 +147,7 @@
         <button id="themeToggle" class="p-2 rounded-xl bg-[rgba(255,255,255,0.02)]">☀️</button>
 
         <div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-[rgba(255,255,255,0.02)]">
-          <img id="profileImg" src="/Assets/Best_brain_Logo-removebg-preview.png" class="w-9 h-9 rounded-full border-2 border-[rgba(59,130,246,0.9)]" alt="profile"/>
+          <img id="profileImg" src="/Assets/image logo logo round.jpg" class="w-9 h-9 rounded-full border-2 border-[rgba(59,130,246,0.9)]" alt="profile"/>
           <div class="text-sm">Officer</div>
         </div>
       </div>
@@ -323,6 +339,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, query, orderBy, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     // Firebase config (unchanged)
     const firebaseConfig = {
@@ -335,6 +352,30 @@
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+
+const auth = getAuth(app);
+
+
+
+
+
+
+window.addEventListener("DOMContentLoaded", () => {
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      // alert("Logout button clicked ✅"); // test first
+      signOut(auth).then(() => {
+        window.location.href = "/index.html"; // change to your login page
+      }).catch((error) => {
+        console.error("Logout error:", error);
+        alert("Logout failed. Try again.");
+      });
+    });
+  }
+});
+
+
 
     // UI refs
     const searchInput = document.getElementById('searchInput');
@@ -410,6 +451,8 @@
     document.getElementById('closeModal').addEventListener('click', ()=> document.getElementById('detailModal').classList.add('hidden'));
 
 
+
+    
 
 
 // Map init (Leaflet) — Ghana-focused, bounded, limited zoom
@@ -537,8 +580,13 @@ map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
 
     // real-time listener
     const q = query(collection(db,'parcels'), orderBy('timestamp','desc'));
+    
     onSnapshot(q, snapshot => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() 
+        
+      }));
+
+      
 
       // counters
       let rejected=0, shortages=0, newSchool=0, paid=0, part=0, notPaid=0;
@@ -734,6 +782,8 @@ document.getElementById('notifSound').play().catch(err => {
         sheetsContainer.appendChild(sheet);
       });
 
+
+      
     }); // end onSnapshot
     
     // CSV Export
@@ -943,6 +993,7 @@ db.collection('parcels').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
     });
   });
 });
+
 
 
 

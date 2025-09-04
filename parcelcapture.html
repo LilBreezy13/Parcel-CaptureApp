@@ -23,14 +23,22 @@
     window.addEventListener('resize', setVh);
     window.addEventListener('orientationchange', setVh);
   </script>
+
+    <link rel="icon" href="/favicon (1).ico" type="image/x-icon">
+<link rel="shortcut icon" href="/favicon (1).ico" type="image/x-icon">
+
 </head>
+
+
 <body class="vh-screen flex flex-col">
 
   <!-- Navbar -->
   <header class="bg-white shadow-md px-4 py-3 flex justify-between items-center">
     <h1 class="text-base sm:text-lg font-bold">Parcel Capture</h1>
     <div class="flex items-center gap-3">
-      <a href="officer.html" class="hidden sm:inline px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs sm:text-sm hover:bg-blue-700">Officer Dashboard</a>
+    <a href="#" id="officerBtn" class="hidden sm:inline px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs sm:text-sm hover:bg-blue-700">
+  Officer Dashboard
+</a
       <div class="relative">
         <button id="userMenuBtn" class="flex items-center gap-2 focus:outline-none">
           <img id="userPhoto" class="w-8 h-8 rounded-full hidden" alt="User photo" />
@@ -477,6 +485,20 @@ onAuthStateChanged(auth, (user) => {
     });
   }
 });
+
+
+ document.getElementById('officerBtn').addEventListener('click', function(e) {
+    e.preventDefault(); // prevent default navigation
+    const correctPin = "1234"; // set your secret PIN
+    const enteredPin = prompt("Enter Officer PIN:");
+
+    if (enteredPin === correctPin) {
+      // If PIN correct, navigate to officer.html
+      window.location.href = "officer.html";
+    } else {
+      alert("❌ Wrong PIN. Access denied.");
+    }
+  });
 
 </script>
 
