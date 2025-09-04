@@ -81,8 +81,10 @@
     </div>
 
     <nav class="space-y-2">
+
       <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="dashboard">🏠 Dashboard</button>
       <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="parcels">📦 Parcels</button>
+      
       <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="reports">📈 Reports</button>
       <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="settings">⚙️ Settings</button>
     </nav>
@@ -129,7 +131,7 @@
         <button id="themeToggle" class="p-2 rounded-xl bg-[rgba(255,255,255,0.02)]">☀️</button>
 
         <div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-[rgba(255,255,255,0.02)]">
-          <img id="profileImg" src="https://via.placeholder.com/36" class="w-9 h-9 rounded-full border-2 border-[rgba(59,130,246,0.9)]" alt="profile"/>
+          <img id="profileImg" src="/Assets/Best_brain_Logo-removebg-preview.png" class="w-9 h-9 rounded-full border-2 border-[rgba(59,130,246,0.9)]" alt="profile"/>
           <div class="text-sm">Officer</div>
         </div>
       </div>
@@ -246,10 +248,55 @@
         </div>
       </section>
 
-      <!-- Reports placeholder -->
-      <section id="page-reports" class="hidden">
-        <div class="p-4 rounded-xl glass"><h2 class="font-semibold">Reports</h2><p class="text-sm muted mt-2">Coming soon...</p></div>
-      </section>
+<!-- Reports Section -->
+<section id="page-reports" class="hidden">
+  <div class="p-4 rounded-xl glass space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-lg">Reports</h2>
+      <div class="flex gap-2">
+        <select id="reportFilter" class="p-2 rounded-xl border border-white/6 select-dark">
+          <option value="all">All</option>
+          <option value="daily">Daily</option>
+          <option value="monthly">Monthly</option>
+        </select>
+        <button id="exportExcel" class="px-3 py-2 rounded bg-green-600 text-white text-sm">
+          Export Excel
+        </button>
+        <button id="exportWord" class="px-3 py-2 rounded bg-blue-600 text-white text-sm">
+          Export Word
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table id="reportsTable" class="min-w-full text-sm border-collapse">
+        <thead class="bg-[rgba(255,255,255,0.03)]">
+          <tr>
+            <th class="border border-white/10 p-2">Parcel ID</th>
+            <th class="border border-white/10 p-2">Officer</th>
+            <th class="border border-white/10 p-2">Name</th>
+            <th class="border border-white/10 p-2">Contact</th>
+            <th class="border border-white/10 p-2">Address</th>
+            <th class="border border-white/10 p-2">Status 02</th>
+            <th class="border border-white/10 p-2">Paid</th>
+            <th class="border border-white/10 p-2">Part Payment</th>
+            <th class="border border-white/10 p-2">Not Paid</th>
+            <th class="border border-white/10 p-2">Date</th>
+          </tr>
+        </thead>
+        <tbody id="reportsTableBody" class="divide-y divide-white/5">
+          <tr>
+            <td colspan="10" class="p-4 text-center text-xs text-gray-400">
+              No data loaded yet
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+
 
       <!-- Settings placeholder -->
       <section id="page-settings" class="hidden">
@@ -266,6 +313,11 @@
       <div id="modalContent" class="text-sm"></div>
     </div>
   </div>
+
+<audio id="notifSound" src="/sound/17571.mp3" preload="auto"></audio>
+
+
+
 
   <!-- Script (full, functional) -->
   <script type="module">
@@ -611,6 +663,11 @@ map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
 
       // notif badge
       notifBadge.textContent = unreadCount;
+      // Play notification sound
+document.getElementById('notifSound').play().catch(err => {
+  console.log("Sound autoplay blocked:", err);
+});
+
 
       // region summary list
       regionSummaryEl.innerHTML = '';
@@ -678,7 +735,7 @@ map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
       });
 
     }); // end onSnapshot
-
+    
     // CSV Export
     document.getElementById('exportCsv').addEventListener('click', async ()=>{
       const snap = await getDocs(collection(db,'parcels'));
@@ -741,6 +798,154 @@ map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
 
     // set lastSeen on page load if not set (so existing items considered read)
     if (!localStorage.getItem(lastSeenKey)) setLastSeen(Date.now());
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  const reportFilter = document.getElementById('reportFilter');
+  const reportsTableBody = document.getElementById('reportsTableBody');
+  const exportExcelBtn = document.getElementById('exportExcel');
+  const exportWordBtn = document.getElementById('exportWord');
+
+  if (!reportFilter || !reportsTableBody) return;
+
+  async function loadReports(filter = 'all') {
+    try {
+      const snap = await getDocs(collection(db, 'parcels'));
+      const rows = [];
+      const now = new Date();
+
+      snap.forEach(doc => {
+        const d = doc.data();
+        const ts = d.timestamp?.seconds ? new Date(d.timestamp.seconds * 1000) : new Date();
+        const isToday = ts.toDateString() === now.toDateString();
+        const isThisMonth = ts.getMonth() === now.getMonth() && ts.getFullYear() === now.getFullYear();
+
+        if (filter === 'daily' && !isToday) return;
+        if (filter === 'monthly' && !isThisMonth) return;
+
+        rows.push({
+          id: doc.id,
+          officer: d.capturer || d.officer || '—',
+          name: d.name || d.school || '—',
+          contact: d.contact || '—',
+          address: d.address || '—',
+          status02: d.status02 || '—',
+          paid: d.paid || '—',
+          partPayment: d.part_payment || '—',
+          notPaid: d.not_paid || '—',
+          date: ts.toLocaleString()
+        });
+      });
+
+      reportsTableBody.innerHTML = rows.length
+        ? rows.map(r => `
+            <tr>
+              <td class="p-2 border border-gray-700">${r.id}</td>
+              <td class="p-2 border border-gray-700">${r.officer}</td>
+              <td class="p-2 border border-gray-700">${r.name}</td>
+              <td class="p-2 border border-gray-700">${r.contact}</td>
+              <td class="p-2 border border-gray-700">${r.address}</td>
+              <td class="p-2 border border-gray-700">${r.status02}</td>
+              <td class="p-2 border border-gray-700">${r.paid}</td>
+              <td class="p-2 border border-gray-700">${r.partPayment}</td>
+              <td class="p-2 border border-gray-700">${r.notPaid}</td>
+              <td class="p-2 border border-gray-700">${r.date}</td>
+            </tr>
+          `).join('')
+        : `<tr><td colspan="10" class="p-4 text-center text-xs text-gray-400">No data available</td></tr>`;
+    } catch (err) {
+      console.error("Error loading reports:", err);
+    }
+  }
+
+  function exportTable(format) {
+    let table = document.getElementById('reportsTable');
+    if (!table) return;
+
+    let html = table.outerHTML.replace(/ /g, '%20');
+    let filename = `Reports_${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xls' : 'doc'}`;
+    let mime = format === 'excel'
+      ? 'application/vnd.ms-excel'
+      : 'application/msword';
+
+    let link = document.createElement('a');
+    link.href = 'data:' + mime + ';charset=utf-8,' + html;
+    link.download = filename;
+    link.click();
+  }
+
+  reportFilter.addEventListener('change', () => loadReports(reportFilter.value));
+  exportExcelBtn.addEventListener('click', () => exportTable('excel'));
+  exportWordBtn.addEventListener('click', () => exportTable('word'));
+
+  loadReports();
+});
+
+
+    // --- Dynamic Parcel Tabs by Date ---
+const parcelsTabs = document.getElementById('parcelsTabs');
+const parcelsSheets = document.getElementById('parcelsSheets');
+
+function createParcelCard(d) {
+  return `
+    <div class="p-3 rounded-lg bg-[rgba(255,255,255,0.02)] border border-white/6">
+      <div class="font-semibold">${d.name || d.school || 'Unnamed'}</div>
+      <div class="text-xs muted">${d.address || d.location || 'No address'}</div>
+      <div class="text-xs muted">📞 ${d.phone || d.contact || 'N/A'}</div>
+      <div class="text-xs muted">${new Date(d.timestamp?.seconds ? d.timestamp.seconds * 1000 : d.timestamp).toLocaleString()}</div>
+      <div class="mt-1">${typeof badgesHtml === 'function' ? badgesHtml(d.status1, d.status2) : ''}</div>
+    </div>
+  `;
+}
+
+function loadParcelsForDate(parcels, dateKey) {
+  const today = new Date().toISOString().split('T')[0];
+  const filtered = dateKey === 'today'
+    ? parcels.filter(p => new Date(p.timestamp?.seconds ? p.timestamp.seconds * 1000 : p.timestamp)
+        .toISOString().split('T')[0] === today)
+    : parcels.filter(p => new Date(p.timestamp?.seconds ? p.timestamp.seconds * 1000 : p.timestamp)
+        .toISOString().split('T')[0] === dateKey);
+
+  parcelsSheets.innerHTML = filtered.length
+    ? filtered.map(createParcelCard).join('')
+    : `<p class="text-xs muted">No parcels for this date.</p>`;
+}
+
+// Firestore listener
+db.collection('parcels').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+  const parcels = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const uniqueDates = [...new Set(parcels.map(p => {
+    const date = new Date(p.timestamp?.seconds ? p.timestamp.seconds * 1000 : p.timestamp);
+    return date.toISOString().split('T')[0];
+  }))];
+
+  // Build tabs
+  parcelsTabs.innerHTML = `<button class="tab-btn active" data-date="today">Today</button>`;
+  uniqueDates.forEach(d => {
+    if (d !== new Date().toISOString().split('T')[0]) {
+      const btn = document.createElement('button');
+      btn.className = 'tab-btn';
+      btn.dataset.date = d;
+      btn.textContent = d;
+      parcelsTabs.appendChild(btn);
+    }
+  });
+
+  // Default load
+  loadParcelsForDate(parcels, 'today');
+
+  // Tab click event
+  document.querySelectorAll('.tab-btn').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      loadParcelsForDate(parcels, tab.dataset.date);
+    });
+  });
+});
+
+
+
   </script>
 </body>
 </html>

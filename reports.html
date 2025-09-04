@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parcel Reports</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.2.0/docx.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+  <div class="max-w-7xl mx-auto p-6">
+    <h1 class="text-2xl font-bold mb-4">Parcel Reports</h1>
+
+    <!-- Filter Section -->
+    <div class="flex flex-col md:flex-row gap-4 mb-6">
+      <select id="reportType" class="p-2 border rounded">
+        <option value="daily">Daily</option>
+        <option value="monthly">Monthly</option>
+        <option value="all">All-time</option>
+      </select>
+      <input type="date" id="datePicker" class="p-2 border rounded">
+      <input type="month" id="monthPicker" class="p-2 border rounded hidden">
+      <button id="loadReport" class="px-4 py-2 bg-blue-600 text-white rounded">Load Report</button>
+    </div>
+
+    <!-- Report Table -->
+    <div class="bg-white p-4 rounded shadow overflow-x-auto">
+      <table class="min-w-full text-sm" id="reportTable">
+        <thead class="bg-gray-200">
+          <tr>
+            <th class="px-4 py-2 text-left">Parcel ID</th>
+            <th class="px-4 py-2 text-left">Sender</th>
+            <th class="px-4 py-2 text-left">Receiver</th>
+            <th class="px-4 py-2 text-left">Status</th>
+            <th class="px-4 py-2 text-left">Payment</th>
+            <th class="px-4 py-2 text-left">Date</th>
+          </tr>
+        </thead>
+        <tbody id="reportBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Export Buttons -->
+    <div class="flex gap-4 mt-6">
+      <button id="exportExcel" class="px-4 py-2 bg-green-600 text-white rounded">Export Excel</button>
+      <button id="exportWord" class="px-4 py-2 bg-purple-600 text-white rounded">Export Word</button>
+    </div>
+  </div>
+
+  <script>
+  // Firebase config (from your Parcel Officer project)
+const firebaseConfig = {
+  apiKey: "AIzaSyDKe2AhjqZncvNa1Gh17CbOEgU3ezd1Vhs",
+  authDomain: "parcel-track-40856.firebaseapp.com",
+  projectId: "parcel-track-40856",
+  storageBucket: "parcel-track-40856.appspot.com",
+  messagingSenderId: "441247156991",
+  appId: "1:441247156991:web:e41db0ecbedf60b6064f92"
+};
+
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+    const reportType = document.getElementById('reportType');
+    const datePicker = document.getElementById('datePicker');
+    const monthPicker = document.getElementById('monthPicker');
+    const loadReport = document.getElementById('loadReport');
+    const reportBody = document.getElementById('reportBody');
+
+    // Show/hide pickers based on selection
+    reportType.addEventListener('change', () => {
+      if (reportType.value === 'daily') {
+        datePicker.classList.remove('hidden');
+        monthPicker.classList.add('hidden');
+      } else if (reportType.value === 'monthly') {
+        datePicker.classList.add('hidden');
+        monthPicker.classList.remove('hidden');
+      } else {
+        datePicker.classList.add('hidden');
+        monthPicker.classList.add('hidden');
+      }
+    });
+
+    // Load report data
+    loadReport.addEventListener('click', async () => {
+      reportBody.innerHTML = '';
+      let query = db.collection('parcels');
+      const type = reportType.value;
+
+      if (type === 'daily') {
+        const selectedDate = datePicker.value;
+        query = query.where('date', '==', selectedDate);
+      } else if (type === 'monthly') {
+        const selectedMonth = monthPicker.value;
+        if (selectedMonth) {
+          const [year, month] = selectedMonth.split('-');
+          const start = `${year}-${month}-01`;
+          const end = `${year}-${month}-31`;
+          query = query.where('date', '>=', start).where('date', '<=', end);
+        }
+      }
+
+      const snapshot = await query.get();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const row = `
+          <tr class="border-b">
+            <td class="px-4 py-2">${doc.id}</td>
+            <td class="px-4 py-2">${data.sender || ''}</td>
+            <td class="px-4 py-2">${data.receiver || ''}</td>
+            <td class="px-4 py-2">${data.status || ''}</td>
+            <td class="px-4 py-2">${data.payment || ''}</td>
+            <td class="px-4 py-2">${data.date || ''}</td>
+          </tr>
+        `;
+        reportBody.insertAdjacentHTML('beforeend', row);
+      });
+    });
+
+    // Export Excel
+    document.getElementById('exportExcel').addEventListener('click', () => {
+      const wb = XLSX.utils.book_new();
+      const table = document.getElementById('reportTable');
+      const ws = XLSX.utils.table_to_sheet(table);
+      XLSX.utils.book_append_sheet(wb, ws, "Parcel Report");
+      XLSX.writeFile(wb, "parcel_report.xlsx");
+    });
+
+
+
+   // Export Word
+document.getElementById('exportWord').addEventListener('click', async () => {
+  const { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, TextRun } = window.docx;
+
+  // Create rows from table
+  const tableElement = document.getElementById('reportTable');
+  const rows = Array.from(tableElement.querySelectorAll('tr'));
+  const tableRows = rows.map((row, index) => {
+    const cells = Array.from(row.querySelectorAll('th, td'));
+    return new TableRow({
+      children: cells.map(cell => new TableCell({
+        width: { size: 20, type: WidthType.PERCENTAGE },
+        children: [new Paragraph({
+          children: [new TextRun({
+            text: cell.textContent,
+            bold: index === 0 // Bold for header row
+          })]
+        })]
+      }))
+    });
+  });
+
+  const reportTypeLabel = reportType.value === 'daily'
+    ? `Daily Report (${datePicker.value})`
+    : reportType.value === 'monthly'
+    ? `Monthly Report (${monthPicker.value})`
+    : `All-time Report`;
+
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({ children: [new TextRun({ text: `Parcel Report - ${reportTypeLabel}`, bold: true, size: 28 })] }),
+        new Paragraph({ text: "" }), // Spacer
+        new Table({ rows: tableRows })
+      ]
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Parcel_Report_${Date.now()}.docx`;
+  a.click();
+});
+
+
+  </script>
+</body>
+</html>
