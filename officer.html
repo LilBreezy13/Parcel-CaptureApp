@@ -21,7 +21,7 @@
     .glass {
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
       border: 1px solid rgba(255,255,255,0.03);
-      backdrop-filter: blur(6px);
+      backdrop-filter: blur(2px);
     }
     html.light .glass {
       background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.9));
@@ -65,6 +65,53 @@
     .select-light { background: white; color: #0b1222; }
     .select-dark { background: rgba(255,255,255,0.02); color: #e6eef8; }
 
+
+/* Light mode overrides for modals */
+html.light #detailModal > div {
+  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9));
+  border: 1px solid #3B82F6; /* blue solid border like dark mode */
+  color: #0b1222;
+}
+
+/* Cards: parcels, latest list, sheets */
+html.light .parcel-card,
+html.light .glass {
+  border: 1px solid #3B82F6; /* solid blue border in light mode */
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.9));
+  color: #0b1222;
+}
+
+/* Search input & status filter border */
+html.light #searchInput,
+html.light #statusFilter,
+html.light #reportFilter {
+  border: 1px solid #3B82F6; /* blue border */
+  background: #fff;
+  color: #0b1222;
+}
+
+/* Notification dropdown in light mode */
+html.light #notifDropdown {
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #3B82F6;
+  color: #0b1222;
+}
+
+/* Modal button text color in light mode */
+html.light #detailModal button {
+  color: #0b1222;
+}
+
+/* Optional: hovered cards in light mode */
+html.light .parcel-card:hover {
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+html.light aside {
+  background: #f7f9fc;  /* same as page background */
+  border-right: 1px solid #cbd5e1; /* light border for separation */
+  box-shadow: none; /* remove shadow if any */
+}
 
     
   </style>
