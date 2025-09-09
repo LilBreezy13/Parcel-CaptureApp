@@ -142,7 +142,8 @@ html.light aside {
       <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="parcels">📦 Parcels</button>
       
       <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="reports">📈 Reports</button>
-      <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="settings">⚙️ Settings</button>
+      <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="statistics">📊 Statistics</button>
+
       <!-- <button class="nav-btn w-full text-left p-3 rounded-xl glass" data-page="settings">⚙️ Logout</button> -->
    
 <button id="logoutBtn" type="button" 
@@ -362,9 +363,41 @@ html.light aside {
 
 
       <!-- Settings placeholder -->
-      <section id="page-settings" class="hidden">
-        <div class="p-4 rounded-xl glass"><h2 class="font-semibold">Settings</h2><p class="text-sm muted mt-2">Coming soon...</p></div>
-      </section>
+      <!-- Statistics -->
+<section id="page-statistics" class="hidden">
+  <div class="p-4 rounded-xl glass space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-lg">Statistics</h2>
+      <div class="flex gap-2">
+        <select id="statsFilter" class="p-2 rounded-xl border border-white/6 select-dark">
+          <option value="daily">Daily</option>
+          <option value="monthly">Monthly</option>
+        </select>
+        <button id="exportStats" class="px-3 py-2 rounded bg-green-600 text-white text-sm">
+          Export Excel
+        </button>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="p-4 rounded-xl glass">
+        <h3 class="font-semibold mb-2">Shortages (Top)</h3>
+        <ul id="statsShortages" class="space-y-2 text-sm"></ul>
+      </div>
+
+      <div class="p-4 rounded-xl glass">
+        <h3 class="font-semibold mb-2">Rejected (Top)</h3>
+        <ul id="statsRejected" class="space-y-2 text-sm"></ul>
+      </div>
+
+      <div class="p-4 rounded-xl glass">
+        <h3 class="font-semibold mb-2">New Schools (Top)</h3>
+        <ul id="statsNew" class="space-y-2 text-sm"></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
     </main>
   </div>
 
@@ -404,6 +437,95 @@ const auth = getAuth(app);
 
 
 
+// ===== Statistics (Daily/Monthly) =====
+let lastStatsCounts = { shortages: {}, rejected: {}, new: {} };
+
+async function loadStatistics(mode = 'daily') {
+  const ulShort = document.getElementById('statsShortages');
+  const ulRej   = document.getElementById('statsRejected');
+  const ulNew   = document.getElementById('statsNew');
+  if (!ulShort || !ulRej || !ulNew) return;
+
+  const snap = await getDocs(collection(db, 'parcels'));
+  const now = new Date();
+
+  const counters = { shortages: {}, rejected: {}, new: {} };
+
+  snap.forEach(doc => {
+    const d = doc.data();
+    const ts = d.timestamp?.seconds ? new Date(d.timestamp.seconds * 1000) : new Date();
+    const isToday = ts.toDateString() === now.toDateString();
+    const isThisMonth = ts.getMonth() === now.getMonth() && ts.getFullYear() === now.getFullYear();
+
+    if (mode === 'daily' && !isToday) return;
+    if (mode === 'monthly' && !isThisMonth) return;
+
+    const officer = d.capturer || d.officer || 'Unknown';
+    const s1 = String(d.status1 || '').toLowerCase();
+    const s2 = String(d.status2 || '').toLowerCase();
+
+    if (s1.includes('short')   || s2.includes('short'))    counters.shortages[officer] = (counters.shortages[officer] || 0) + 1;
+    if (s1.includes('rejected')|| s2.includes('rejected')) counters.rejected[officer]  = (counters.rejected[officer]  || 0) + 1;
+    if (s1.includes('new')     || s2.includes('new'))      counters.new[officer]       = (counters.new[officer]       || 0) + 1;
+  });
+
+  lastStatsCounts = counters;
+
+  const render = (obj, ul) => {
+    const arr = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+    ul.innerHTML = arr.length
+      ? arr.map(([name, count], i) =>
+          `<li class="flex items-center justify-between p-2 rounded bg-[rgba(255,255,255,0.02)] border border-white/6">
+             <span>${i + 1}. ${name}</span><b>${count}</b>
+           </li>`).join('')
+      : `<li class="text-xs muted">No data</li>`;
+  };
+
+  render(counters.shortages, ulShort);
+  render(counters.rejected,  ulRej);
+  render(counters.new,       ulNew);
+}
+
+function exportStatsExcel() {
+  const section = (label, obj) => {
+    const arr = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+    let html = `<tr><th colspan="3" style="text-align:left">${label}</th></tr>
+                <tr><th>Rank</th><th>Officer</th><th>Count</th></tr>`;
+    if (!arr.length) {
+      html += `<tr><td colspan="3">No data</td></tr>`;
+    } else {
+      arr.forEach(([name, count], i) => {
+        html += `<tr><td>${i + 1}</td><td>${name}</td><td>${count}</td></tr>`;
+      });
+    }
+    return html;
+  };
+
+  const tableHtml = `<table>
+    ${section('Shortages',  lastStatsCounts.shortages)}
+    ${section('Rejected',   lastStatsCounts.rejected)}
+    ${section('New Schools',lastStatsCounts.new)}
+  </table>`;
+
+  const link = document.createElement('a');
+  link.href = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(tableHtml);
+  link.download = `Statistics_${new Date().toISOString().split('T')[0]}.xls`;
+  link.click();
+}
+
+// Wire up events + initial load
+document.addEventListener('DOMContentLoaded', () => {
+  const statsFilterEl = document.getElementById('statsFilter');
+  if (statsFilterEl) {
+    statsFilterEl.addEventListener('change', e => loadStatistics(e.target.value));
+  }
+  const exportBtn = document.getElementById('exportStats');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportStatsExcel);
+  }
+  // initial data
+  loadStatistics('daily');
+});
 
 
 
@@ -450,7 +572,7 @@ window.addEventListener("DOMContentLoaded", () => {
       dashboard: document.getElementById('page-dashboard'),
       parcels: document.getElementById('page-parcels'),
       reports: document.getElementById('page-reports'),
-      settings: document.getElementById('page-settings')
+       statistics: document.getElementById('page-statistics')
     };
     document.querySelectorAll('.nav-btn').forEach(btn=>{
       btn.addEventListener('click', ()=> {
