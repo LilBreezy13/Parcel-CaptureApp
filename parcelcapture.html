@@ -29,15 +29,26 @@
 
 <body class="vh-screen flex flex-col">
 
-  <!-- Navbar -->
-  <header class="bg-white shadow-md px-4 py-3 flex justify-between items-center">
-    <h1 class="text-base sm:text-lg font-bold">Parcel Capture</h1>
-    <div class="flex items-center gap-3">
-      <span id="userInfo" class="text-sm font-medium text-gray-700"></span>
-      <button id="signOutBtn" class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs sm:text-sm hover:bg-red-700">Sign out</button>
-    </div>
-    
-  </header>
+<!-- Navbar -->
+<header class="bg-white shadow-md px-4 py-3 flex justify-between items-center">
+  <h1 class="text-base sm:text-lg font-bold">Parcel Capture</h1>
+  <div class="flex items-center gap-3">
+    <span id="userInfo" class="text-sm font-medium text-gray-700"></span>
+
+    <!-- Officer Dashboard button (hidden on mobile, visible on sm and up) -->
+    <a href="#" id="officerBtn"
+       class="hidden sm:inline-flex px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow hover:bg-blue-700">
+      Officer Dashboard
+    </a>
+
+    <!-- Sign Out button -->
+    <button id="signOutBtn"
+      class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium shadow hover:bg-red-700 w-full sm:w-auto text-center">
+      Sign Out
+    </button>
+  </div>
+</header>
+
 
   <!-- Main -->
   <main class="kb-scroll flex-1 p-3 sm:p-4 max-w-md mx-auto w-full space-y-5">
@@ -97,7 +108,7 @@
 
     <!-- Parcel Status 01 -->
     <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-4">
-      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Parcel Status 01</h2>
+      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Parcel Status </h2>
       <div id="status1" class="space-y-2">
         <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
           <input type="checkbox" name="status1" value="Rejected" class="status1-checkbox w-4 h-4 text-blue-600 rounded"><span class="text-sm">Rejected</span>
@@ -119,7 +130,7 @@
 
     <!-- Parcel Status 02 -->
     <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-4">
-      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Parcel Status 02</h2>
+      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Payment Status </h2>
       <div id="status2" class="space-y-2">
         <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
           <input type="checkbox" name="status2" value="Paid" class="status2-checkbox w-4 h-4 text-green-600 rounded"><span class="text-sm">Paid</span>
@@ -499,13 +510,8 @@
       }
     });
 
-
-    // ===== Officer PIN logic =====
-const officerBtn = document.createElement("button");
-officerBtn.textContent = "Officer Dashboard";
-officerBtn.className = "px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs sm:text-sm hover:bg-blue-700";
-document.querySelector("header .flex.items-center").prepend(officerBtn);
-
+// ===== Officer PIN logic =====
+const officerBtn = document.getElementById("officerBtn"); // use the existing button
 const pinModal = document.getElementById("pinModal");
 const officerPinInput = document.getElementById("officerPinInput");
 const submitPinBtn = document.getElementById("submitPinBtn");
@@ -514,13 +520,15 @@ const pinError = document.getElementById("pinError");
 
 const correctPin = "1234"; // 🔐 Change this to your secret PIN
 
-officerBtn.addEventListener("click", (e) => {
-  e.preventDefault();
-  officerPinInput.value = "";
-  pinError.classList.add("hidden");
-  pinModal.classList.remove("hidden");
-  officerPinInput.focus();
-});
+if (officerBtn) {
+  officerBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    officerPinInput.value = "";
+    pinError.classList.add("hidden");
+    pinModal.classList.remove("hidden");
+    officerPinInput.focus();
+  });
+}
 
 cancelPinBtn.addEventListener("click", () => {
   pinModal.classList.add("hidden");
@@ -541,6 +549,7 @@ submitPinBtn.addEventListener("click", () => {
 officerPinInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") submitPinBtn.click();
 });
+
 
 
   </script>
