@@ -334,20 +334,25 @@ html.light aside {
 
     <div class="overflow-x-auto">
       <table id="reportsTable" class="min-w-full text-sm border-collapse">
-        <thead class="bg-[rgba(255,255,255,0.03)]">
-          <tr>
-            <th class="border border-white/10 p-2">Parcel ID</th>
-            <th class="border border-white/10 p-2">Officer</th>
-            <th class="border border-white/10 p-2">Name</th>
-            <th class="border border-white/10 p-2">Contact</th>
-            <th class="border border-white/10 p-2">Address</th>
-            <th class="border border-white/10 p-2">Status 02</th>
-            <th class="border border-white/10 p-2">Paid</th>
-            <th class="border border-white/10 p-2">Part Payment</th>
-            <th class="border border-white/10 p-2">Not Paid</th>
-            <th class="border border-white/10 p-2">Date</th>
-          </tr>
-        </thead>
+     <thead class="bg-[rgba(255,255,255,0.03)]">
+  <tr>
+    <th class="border border-white/10 p-2">Parcel ID</th>
+    <th class="border border-white/10 p-2">Captured By</th>
+    <th class="border border-white/10 p-2">Parcel Sent By</th> <!-- ✅ NEW -->
+    <th class="border border-white/10 p-2">Name</th>
+    <th class="border border-white/10 p-2">Contact</th>
+    <th class="border border-white/10 p-2">Address</th>
+    <th class="border border-white/10 p-2">Status 02</th>
+    <th class="border border-white/10 p-2">Paid</th>
+    <th class="border border-white/10 p-2">Part Payment</th>
+    <th class="border border-white/10 p-2">Not Paid</th>
+    <th class="border border-white/10 p-2">Rejected Amount</th>
+<th class="border border-white/10 p-2">Date</th>
+
+    <th class="border border-white/10 p-2">Date</th>
+  </tr>
+</thead>
+
         <tbody id="reportsTableBody" class="divide-y divide-white/5">
           <tr>
             <td colspan="10" class="p-4 text-center text-xs text-gray-400">
@@ -460,7 +465,10 @@ async function loadStatistics(mode = 'daily') {
     if (mode === 'daily' && !isToday) return;
     if (mode === 'monthly' && !isThisMonth) return;
 
-    const officer = d.capturer || d.officer || 'Unknown';
+   const officer = d.capturerName 
+  ? `${d.capturerName} (${d.capturerId || ''}, ${d.role || ''})`
+  : 'Unknown';
+
     const s1 = String(d.status1 || '').toLowerCase();
     const s2 = String(d.status2 || '').toLowerCase();
 
@@ -729,7 +737,11 @@ map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
           <p><b>Name:</b> ${esc(d.name||'')}</p>
           <p><b>Address:</b> ${esc(d.address||'')}</p>
           <p><b>Phone:</b> ${esc(d.phone||'')}</p>
-          <p><b>Captured by:</b> ${esc(d.capturer||'')}</p>
+          <p><b>Captured by:</b> ${esc(d.capturerName || '')} (${esc(d.capturerId || '')}, ${esc(d.role || '')})</p>
+<p><b>Parcel Sent By:</b> ${esc(d.sender || '')}</p>
+
+
+
           <div class="mt-2">${badgesHtml(d.status1, d.status2)}</div>
           <p class="text-xs muted mt-2">Doc ID: ${d.id}</p>
         `);
@@ -958,23 +970,31 @@ document.getElementById('notifSound').play().catch(err => {
     // CSV Export
     document.getElementById('exportCsv').addEventListener('click', async ()=>{
       const snap = await getDocs(collection(db,'parcels'));
-      const rows = [['id','name','address','phone','capturer','status1','status2','photoCount','timestamp','lat','lng','region']];
+   const rows = [['id','name','address','phone','capturerId','capturerName','role','sender','status1','status2','rejectionFee','photoCount','timestamp','lat','lng','region']];
+
+
+
       snap.forEach(doc=>{
         const d = doc.data();
-        rows.push([
-          doc.id,
-          d.name||'',
-          d.address||'',
-          d.phone||'',
-          d.capturer||'',
-          d.status1||'',
-          d.status2||'',
-          Array.isArray(d.photos)? d.photos.length : (d.photoCount ?? 0),
-          formatTimestamp(d.timestamp),
-          d.lat ?? '',
-          d.lng ?? '',
-          d.region ?? d.state ?? d.country ?? ''
-        ]);
+       rows.push([
+  doc.id,
+  d.name || '',
+  d.address || '',
+  d.phone || '',
+  d.capturerId || '',
+  d.capturerName || '',
+  d.role || '',
+  d.sender || '',
+  d.status1 || '',
+  d.status2 || '',
+   d.rejectionFee || 0, 
+  Array.isArray(d.photos) ? d.photos.length : (d.photoCount ?? 0),
+  formatTimestamp(d.timestamp),
+  d.lat ?? '',
+  d.lng ?? '',
+  d.region ?? d.state ?? d.country ?? ''
+]);
+
       });
       const csv = rows.map(r=> r.map(c=> `"${String(c).replaceAll('"','""')}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type:'text/csv' });
@@ -1043,35 +1063,43 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filter === 'monthly' && !isThisMonth) return;
 
         rows.push({
-          id: doc.id,
-          officer: d.capturer || d.officer || '—',
-          name: d.name || d.school || '—',
-          contact: d.contact || '—',
-          address: d.address || '—',
-          status02: d.status02 || '—',
-          paid: d.paid || '—',
-          partPayment: d.part_payment || '—',
-          notPaid: d.not_paid || '—',
-          date: ts.toLocaleString()
-        });
-      });
+  id: doc.id,
+  officer: `${d.capturerName || ''} (${d.capturerId || ''}, ${d.role || ''})`,
+  sender: d.sender || '—',                   // ✅ use sender
+  rejectionFee: d.rejectionFee || 0,         // ✅ new
+  name: d.name || d.school || '—',
+  contact: d.contact || d.phone || '—',
+  address: d.address || '—',
+  status02: d.status2 || d.status1 || '—',   // ✅ fix naming
+  paid: d.paid || '—',
+  partPayment: d.part_payment || '—',
+  notPaid: d.not_paid || '—',
+  date: ts.toLocaleString()
+});
 
-      reportsTableBody.innerHTML = rows.length
-        ? rows.map(r => `
-            <tr>
-              <td class="p-2 border border-gray-700">${r.id}</td>
-              <td class="p-2 border border-gray-700">${r.officer}</td>
-              <td class="p-2 border border-gray-700">${r.name}</td>
-              <td class="p-2 border border-gray-700">${r.contact}</td>
-              <td class="p-2 border border-gray-700">${r.address}</td>
-              <td class="p-2 border border-gray-700">${r.status02}</td>
-              <td class="p-2 border border-gray-700">${r.paid}</td>
-              <td class="p-2 border border-gray-700">${r.partPayment}</td>
-              <td class="p-2 border border-gray-700">${r.notPaid}</td>
-              <td class="p-2 border border-gray-700">${r.date}</td>
-            </tr>
-          `).join('')
-        : `<tr><td colspan="10" class="p-4 text-center text-xs text-gray-400">No data available</td></tr>`;
+      });
+reportsTableBody.innerHTML = rows.length
+  ? rows.map(r => `
+      <tr>
+        <td class="p-2 border border-gray-700">${r.id}</td>
+        <td class="p-2 border border-gray-700">${r.officer}</td>
+       <td class="p-2 border border-gray-700">${r.sender}</td>
+        <td class="p-2 border border-gray-700">${r.name}</td>
+        <td class="p-2 border border-gray-700">${r.contact}</td>
+        <td class="p-2 border border-gray-700">${r.address}</td>
+        <td class="p-2 border border-gray-700">${r.status02}</td>
+        <td class="p-2 border border-gray-700">${r.paid}</td>
+        <td class="p-2 border border-gray-700">${r.partPayment}</td>
+        <td class="p-2 border border-gray-700">${r.notPaid}</td>
+       <td class="p-2 border border-gray-700">${r.rejectionFee}</td>
+<td class="p-2 border border-gray-700">${r.date}</td>
+
+        <td class="p-2 border border-gray-700">${r.date}</td>
+      </tr>
+    `).join('')
+  : '<tr><td colspan="11" class="text-center p-4">No records</td></tr>';
+
+
     } catch (err) {
       console.error("Error loading reports:", err);
     }

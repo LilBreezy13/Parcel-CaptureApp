@@ -30,10 +30,11 @@
 <body class="vh-screen flex flex-col">
 
 <!-- Navbar -->
-<header class="bg-white shadow-md px-4 py-3 flex justify-between items-center">
+<header class="bg-white shadow-md px-4 py-3 flex justify-between items-center transition-transform duration-300">
   <h1 class="text-base sm:text-lg font-bold">Parcel Capture</h1>
   <div class="flex items-center gap-3">
-    <span id="userInfo" class="text-sm font-medium text-gray-700"></span>
+  <span id="userInfo" class="hidden sm:inline text-sm text-gray-600"></span>
+ 
 
     <!-- Officer Dashboard button (hidden on mobile, visible on sm and up) -->
     <a href="#" id="officerBtn"
@@ -47,6 +48,8 @@
       Sign Out
     </button>
   </div>
+
+  
 </header>
 
 
@@ -62,11 +65,11 @@
           <option value="2">2 Shots</option>
           <option value="3">3 Shots</option>
         </select>
-        <select id="role" class="w-full border rounded-md p-2 text-base sm:text-sm">
+        <!-- <select id="role" class="w-full border rounded-md p-2 text-base sm:text-sm">
           <option value="Marketer">Marketer</option>
           <option value="Office Assistant">Office Assistant</option>
           <option value="Management">Management</option>
-        </select>
+        </select> -->
       </div>
 
       <div class="relative w-full">
@@ -198,7 +201,10 @@
 
   </main>
 
-  <footer class="bg-gray-200 text-gray-600 p-3 text-center text-xs sm:text-sm">Parcel Capture • Nicholas Adebayor</footer>
+ <footer class="bg-gray-200 text-gray-600 p-3 text-center text-xs sm:text-sm">
+  <div>Parcel Capture • Nicholas Adebayor</div>
+  <div id="mobileUserInfo" class="mt-1 block sm:hidden text-gray-800 font-medium"></div>
+</footer>
 
   <!-- Scripts -->
   <script type="module">
@@ -230,6 +236,10 @@
     } else {
       document.getElementById("userInfo").textContent = `${user.name} (${user.userId}) - ${user.role}`;
       document.getElementById("capturerName").value = `${user.name} (${user.userId})`;
+      // Show user info under footer on mobile
+document.getElementById("mobileUserInfo").textContent =
+  `Parcel Capture ${user.name} (${user.userId}) - ${user.role}`;
+
       // set the role dropdown to the user's role (keeps your old UI)
       const roleEl = document.getElementById("role");
       if (roleEl) roleEl.value = user.role || roleEl.value;
@@ -550,6 +560,43 @@ officerPinInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") submitPinBtn.click();
 });
 
+
+// Auto-hide navbar on scroll (mobile only)
+if (window.innerWidth < 640) { // sm breakpoint
+  let lastScroll = 0;
+  const header = document.querySelector("header");
+
+  window.addEventListener("scroll", () => {
+    const currentScroll = window.scrollY;
+    if (currentScroll > lastScroll && currentScroll > 50) {
+      // scrolling down → hide navbar
+      header.classList.add("-translate-y-full");
+    } else {
+      // scrolling up → show navbar
+      header.classList.remove("-translate-y-full");
+    }
+    lastScroll = currentScroll;
+  });
+}
+
+
+// Auto-hide navbar on scroll (only mobile)
+if (window.innerWidth < 640) {  // sm breakpoint in Tailwind = 640px
+  let lastScroll = 0;
+  const header = document.querySelector("header");
+
+  window.addEventListener("scroll", () => {
+    const currentScroll = window.scrollY;
+    if (currentScroll > lastScroll && currentScroll > 50) {
+      // Scrolling down → hide navbar
+      header.classList.add("-translate-y-full");
+    } else {
+      // Scrolling up → show navbar
+      header.classList.remove("-translate-y-full");
+    }
+    lastScroll = currentScroll;
+  });
+}
 
 
   </script>
