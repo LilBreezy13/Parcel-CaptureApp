@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Login - Parcel App</title>
   <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="/favicon (1).ico" type="image/x-icon">
+  <link rel="shortcut icon" href="/favicon (1).ico" type="image/x-icon">
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center px-4">
 
   <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-8 sm:p-10">
-    <h1 class="text-2xl font-bold text-gray-800 text-center mb-6">Parcel App Login</h1>
+    <h6 class="text-2xl font-bold text-gray-800 text-center mb-6">Bbeko Parcel App - Login</h6>
 
     <form id="loginForm" class="space-y-4">
       <!-- User ID -->
@@ -19,12 +21,20 @@
                class="w-full rounded-lg border px-3 py-2" />
       </div>
 
+      
       <!-- Password -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-        <input id="loginPassword" type="password" placeholder="Enter password" required
-               class="w-full rounded-lg border px-3 py-2" />
-      </div>
+<div>
+  <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+  <div class="relative">
+    <input id="loginPassword" type="password" placeholder="Enter password" required
+           class="w-full rounded-lg border px-3 py-2 pr-10" />
+    <button type="button" id="togglePassword"
+            class="absolute inset-y-0 right-0 px-3 text-gray-500">
+      👁
+    </button>
+  </div>
+</div>
+
 
       <!-- Role -->
       <div>
@@ -126,6 +136,21 @@
         loginBtn.textContent = "Login";
       }
     });
+
+
+    // Toggle password visibility
+document.getElementById("togglePassword").addEventListener("click", () => {
+  const pwd = document.getElementById("loginPassword");
+  const btn = document.getElementById("togglePassword");
+  if (pwd.type === "password") {
+    pwd.type = "text";
+    btn.textContent = "🙈"; // eye closed
+  } else {
+    pwd.type = "password";
+    btn.textContent = "👁"; // eye open
+  }
+});
+
   </script>
 </body>
 </html>
