@@ -23,12 +23,9 @@
     window.addEventListener('resize', setVh);
     window.addEventListener('orientationchange', setVh);
   </script>
-
-    <link rel="icon" href="/favicon (1).ico" type="image/x-icon">
-<link rel="shortcut icon" href="/favicon (1).ico" type="image/x-icon">
-
+  <link rel="icon" href="/favicon (1).ico" type="image/x-icon">
+  <link rel="shortcut icon" href="/favicon (1).ico" type="image/x-icon">
 </head>
-
 
 <body class="vh-screen flex flex-col">
 
@@ -36,23 +33,8 @@
   <header class="bg-white shadow-md px-4 py-3 flex justify-between items-center">
     <h1 class="text-base sm:text-lg font-bold">Parcel Capture</h1>
     <div class="flex items-center gap-3">
-    <a href="#" id="officerBtn" class="hidden sm:inline px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs sm:text-sm hover:bg-blue-700">
-  Officer Dashboard
-</a
-      <div class="relative">
-        <button id="userMenuBtn" class="flex items-center gap-2 focus:outline-none">
-          <img id="userPhoto" class="w-8 h-8 rounded-full hidden" alt="User photo" />
-          <span id="userName" class="font-medium text-sm"></span>
-          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-          </svg>
-        </button>
-        <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg py-2 text-sm z-50">
-          <p id="userEmail" class="px-4 py-2 text-gray-500 truncate"></p>
-          <hr>
-          <button id="signOutBtn" class="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50">Sign out</button>
-        </div>
-      </div>
+      <span id="userInfo" class="text-sm font-medium text-gray-700"></span>
+      <button id="signOutBtn" class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs sm:text-sm hover:bg-red-700">Sign out</button>
     </div>
   </header>
 
@@ -75,7 +57,6 @@
         </select>
       </div>
 
-      <!-- Live camera preview -->
       <div class="relative w-full">
         <video id="camera" class="w-full rounded-lg bg-black h-48 sm:h-64 object-cover" autoplay playsinline muted></video>
         <canvas id="snapshotCanvas" class="hidden"></canvas>
@@ -99,18 +80,19 @@
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Name on Parcel</label>
-          <input id="parcelName" type="text" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2" placeholder="Enter name">
+          <input id="parcelName" type="text" class="w-full rounded-xl border-gray-300 shadow-sm px-3 py-2" placeholder="Enter name">
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
-          <input id="parcelAddress" type="text" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2" placeholder="Enter address">
+          <input id="parcelAddress" type="text" class="w-full rounded-xl border-gray-300 shadow-sm px-3 py-2" placeholder="Enter address">
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contact / Phone</label>
-          <input id="parcelPhone" type="tel" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2" placeholder="Enter phone number">
+          <input id="parcelPhone" type="tel" class="w-full rounded-xl border-gray-300 shadow-sm px-3 py-2" placeholder="Enter phone number">
         </div>
       </div>
     </section>
+
 
     <!-- Parcel Status 01 -->
     <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-4">
@@ -125,6 +107,12 @@
         <label class="flex items-center gap-3 bg-white px-3 py-2 rounded-lg shadow-sm cursor-pointer">
           <input type="checkbox" name="status1" value="Shortages" class="status1-checkbox w-4 h-4 text-blue-600 rounded"><span class="text-sm">Shortages</span>
         </label>
+
+        <!-- Rejection fee (hidden unless Rejected checked) -->
+        <div id="rejectionFeeWrap" class="hidden mt-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Rejection Fee (GHS)</label>
+          <input id="rejectionFee" type="number" min="0" step="0.01" class="w-full rounded-xl border-gray-300 px-3 py-2" placeholder="Enter amount in GHS">
+        </div>
       </div>
     </section>
 
@@ -144,403 +132,416 @@
       </div>
     </section>
 
-    <!-- Capturer -->
+
+
+       <!-- Sender & Capturer (grouped together as requested) -->
     <section class="bg-blue-50 rounded-xl shadow p-4 sm:p-6 space-y-5">
-      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Captured By</h2>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
-        <input id="capturerName" type="text" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 text-base px-3 py-2" placeholder="Enter your name">
+      <h2 class="text-base sm:text-lg font-semibold text-blue-800">Sender & Capturer</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Parcel Sent By</label>
+          <input id="senderName" type="text" class="w-full rounded-xl border-gray-300 px-3 py-2" placeholder="Enter sender's name">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Captured By</label>
+          <input id="capturerName" type="text" readonly class="w-full rounded-xl border-gray-300 bg-gray-100 px-3 py-2">
+        </div>
       </div>
+    </section>
+
+    <!-- Submit -->
+    <section>
       <div class="flex flex-col sm:flex-row gap-2">
         <button id="submitBtn" class="w-full sm:flex-1 px-6 py-2 bg-green-600 text-white rounded-lg text-sm sm:text-base font-semibold shadow hover:bg-green-700 transition">Submit</button>
       </div>
     </section>
 
     <!-- History Section -->
-  <div class="mt-6">
-  <div class="flex justify-between items-center mb-2">
-    <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100">Submission History</h2>
-    <button id="toggleHistory" class="text-sm text-blue-600 dark:text-blue-400 underline">
-      Show All
-    </button>
-  </div>
-  <div id="latestHistory" class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 mb-2">
-    <!-- Latest entry will appear here -->
-  </div>
-  <div id="historyList" class="hidden max-h-64 overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow p-2 space-y-2">
-    <!-- Full history appears here -->
-  </div>
-</div>
+    <div class="mt-6">
+      <div class="flex justify-between items-center mb-2">
+        <h2 class="text-lg font-bold text-gray-800">Submission History</h2>
+        <button id="toggleHistory" class="text-sm text-blue-600 underline">Show All</button>
+      </div>
+      <div id="latestHistory" class="bg-white rounded-lg shadow p-3 mb-2"></div>
+      <div id="historyList" class="hidden max-h-64 overflow-y-auto bg-white rounded-lg shadow p-2 space-y-2"></div>
+    </div>
 
 
 
 <!-- Officer PIN Modal -->
 <div id="pinModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
-  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-80 p-6 space-y-4">
-    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Enter Officer PIN</h2>
-    <input id="officerPinInput" type="password" placeholder="Enter 4-digit PIN"
-      class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-center text-lg">
+  <div class="bg-white rounded-xl shadow-lg w-80 p-6 space-y-4">
+    <h2 class="text-lg font-semibold text-gray-900">Enter Officer PIN</h2>
+    <input id="officerPinInput" type="password" maxlength="6" placeholder="Enter PIN"
+      class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-lg">
     <div class="flex justify-end gap-2">
-      <button id="cancelPinBtn" class="px-4 py-2 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">Cancel</button>
+      <button id="cancelPinBtn" class="px-4 py-2 rounded-lg bg-gray-300 text-gray-700 hover:bg-gray-400">Cancel</button>
       <button id="submitPinBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Submit</button>
     </div>
     <p id="pinError" class="text-red-500 text-sm hidden">Incorrect PIN. Try again.</p>
   </div>
 </div>
 
+
+
   </main>
 
   <footer class="bg-gray-200 text-gray-600 p-3 text-center text-xs sm:text-sm">Parcel Capture • Nicholas Adebayor</footer>
 
-  <!-- Scripts --><script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { query, where, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  // ===== Firebase config =====
-  const firebaseConfig = {
-    apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
-    authDomain: "employee-app-c781d.firebaseapp.com",
-    projectId: "employee-app-c781d",
-    storageBucket: "employee-app-c781d.appspot.com",
-    messagingSenderId: "232631444018",
-    appId: "1:232631444018:web:37b70fe37975abcc1b922b"
-  };
+  <!-- Scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, serverTimestamp,
+      query, where, onSnapshot
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+    // ===== Firebase config (your project) =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
+      authDomain: "employee-app-c781d.firebaseapp.com",
+      projectId: "employee-app-c781d",
+      storageBucket: "employee-app-c781d.appspot.com",
+      messagingSenderId: "232631444018",
+      appId: "1:232631444018:web:37b70fe37975abcc1b922b"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-  // ===== Auth check =====
-  onAuthStateChanged(auth, (user) => {
-    if (!user) window.location.replace("login.html");
-    else {
-      document.getElementById("userName").textContent = user.displayName || "User";
-      document.getElementById("userEmail").textContent = user.email || "";
-      if (user.photoURL) {
-        const photo = document.getElementById("userPhoto");
-        photo.src = user.photoURL;
-        photo.classList.remove("hidden");
-      }
-      history.pushState(null, "", location.href);
-      window.addEventListener("popstate", () => { history.pushState(null, "", location.href); });
+    // ===== Load logged-in user from sessionStorage (no Firebase Auth) =====
+    const user = (() => {
+      try { return JSON.parse(sessionStorage.getItem("user")); } catch { return null; }
+    })();
+    if (!user || !user.userId) {
+      // not logged in
+      window.location.href = "index.html";
+    } else {
+      document.getElementById("userInfo").textContent = `${user.name} (${user.userId}) - ${user.role}`;
+      document.getElementById("capturerName").value = `${user.name} (${user.userId})`;
+      // set the role dropdown to the user's role (keeps your old UI)
+      const roleEl = document.getElementById("role");
+      if (roleEl) roleEl.value = user.role || roleEl.value;
     }
-  });
 
-  // ===== Dropdown toggle =====
-  const userMenuBtn = document.getElementById("userMenuBtn");
-  const userMenu = document.getElementById("userMenu");
-  userMenuBtn.addEventListener("click", () => { userMenu.classList.toggle("hidden"); });
-  window.addEventListener("click", (e) => { if (!userMenuBtn.contains(e.target)) userMenu.classList.add("hidden"); });
+    // ===== Sign out =====
+    document.getElementById("signOutBtn").addEventListener("click", () => {
+      sessionStorage.removeItem("user");
+      window.location.href = "index.html";
+    });
 
-  // ===== Sign out =====
-  document.getElementById("signOutBtn").addEventListener("click", async () => {
-    await signOut(auth);
-    window.location.replace("index.html");
-  });
+    // ===== Camera & thumbnails (unchanged logic) =====
+    const videoEl = document.getElementById('camera');
+    const canvasEl = document.getElementById('snapshotCanvas');
+    const thumbs = document.getElementById('thumbs');
+    const captureBtn = document.getElementById('captureBtn');
+    const filePicker = document.getElementById('filePicker');
+    const switchCamBtn = document.getElementById('switchCam');
 
-  // ===== Camera + thumbnails =====
-  const videoEl = document.getElementById('camera');
-  const canvasEl = document.getElementById('snapshotCanvas');
-  const thumbs = document.getElementById('thumbs');
-  const captureBtn = document.getElementById('captureBtn');
-  const filePicker = document.getElementById('filePicker');
-  const switchCamBtn = document.getElementById('switchCam');
+    let currentStream = null;
+    let useBackCamera = true;
+    let capturedBlobs = [];
+    const objectUrls = new Set();
 
-  let currentStream = null;
-  let useBackCamera = true;
-  let capturedBlobs = [];
-  const objectUrls = new Set();
-
-  async function startCamera() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      document.getElementById('cameraHint').textContent = 'Camera not available. Use 📁 to select a photo.';
-      return;
-    }
-    if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
-    try {
-      currentStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
-        audio: false
-      });
-    } catch {
-      try {
-        currentStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: useBackCamera ? 'environment' : 'user' },
-          audio: false
-        });
-      } catch (err) {
-        console.warn('Camera failed, use file picker instead', err);
-        document.getElementById('cameraHint').textContent = 'Could not access camera. Use 📁 instead.';
+    async function startCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        document.getElementById('cameraHint').textContent = 'Camera not available. Use 📁 to select a photo.';
         return;
       }
-    }
-    videoEl.srcObject = currentStream;
-  }
-
-  function addThumbFromUrl(url) {
-    const wrap = document.createElement('div');
-    wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
-
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = 'shot';
-    img.className = 'w-full h-full object-cover rounded-lg border';
-
-    const rm = document.createElement('button');
-    rm.type = 'button';
-    rm.className = 'absolute -top-1 -right-1 text-xs bg-black/70 text-white rounded-full px-1';
-    rm.textContent = '✖';
-    rm.addEventListener('click', () => {
-      wrap.remove();
-      if (objectUrls.has(img.src)) {
-        URL.revokeObjectURL(img.src);
-        objectUrls.delete(img.src);
+      if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
+          audio: false
+        });
+      } catch {
+        try {
+          currentStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: useBackCamera ? 'environment' : 'user' },
+            audio: false
+          });
+        } catch (err) {
+          console.warn('Camera failed, use file picker instead', err);
+          document.getElementById('cameraHint').textContent = 'Could not access camera. Use 📁 instead.';
+          return;
+        }
       }
-      capturedBlobs = capturedBlobs.filter(b => b.url !== url);
+      videoEl.srcObject = currentStream;
+    }
+
+    function addThumbFromUrl(url) {
+      const wrap = document.createElement('div');
+      wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
+      const img = document.createElement('img');
+      img.src = url; img.alt = 'shot'; img.className = 'w-full h-full object-cover rounded-lg border';
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'absolute -top-1 -right-1 text-xs bg-black/70 text-white rounded-full px-1';
+      rm.textContent = '✖';
+      rm.addEventListener('click', () => {
+        wrap.remove();
+        if (objectUrls.has(img.src)) { URL.revokeObjectURL(img.src); objectUrls.delete(img.src); }
+        capturedBlobs = capturedBlobs.filter(b => b.url !== url);
+      });
+      wrap.appendChild(img); wrap.appendChild(rm); thumbs.appendChild(wrap);
+    }
+
+    function resizeAndCompress(fileOrBlob, callback) {
+      const img = new Image();
+      const url = URL.createObjectURL(fileOrBlob);
+      img.onload = () => {
+        const maxW = 400, maxH = 300;
+        let { width, height } = img;
+        const ratio = Math.min(maxW / width, maxH / height, 1);
+        width = Math.round(width * ratio); height = Math.round(height * ratio);
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob => { callback(blob); URL.revokeObjectURL(url); }, "image/jpeg", 0.4);
+      };
+      img.src = url;
+    }
+
+    captureBtn.addEventListener('click', () => {
+      if (!videoEl.videoWidth) return;
+      canvasEl.width = videoEl.videoWidth; canvasEl.height = videoEl.videoHeight;
+      const ctx = canvasEl.getContext('2d'); ctx.drawImage(videoEl, 0, 0);
+      canvasEl.toBlob(blob => {
+        if (!blob) return;
+        resizeAndCompress(blob, resized => {
+          const url = URL.createObjectURL(resized);
+          objectUrls.add(url); capturedBlobs.push({ blob: resized, url });
+          addThumbFromUrl(url);
+        });
+      }, "image/jpeg", 0.8);
     });
 
-    wrap.appendChild(img);
-    wrap.appendChild(rm);
-    thumbs.appendChild(wrap);
-  }
-
-  // ===== Resize + compress helper (UI only, no upload) =====
-  function resizeAndCompress(fileOrBlob, callback) {
-    const img = new Image();
-    const url = URL.createObjectURL(fileOrBlob);
-    img.onload = () => {
-      const maxW = 400, maxH = 300;
-      let { width, height } = img;
-      const ratio = Math.min(maxW / width, maxH / height, 1);
-      width = Math.round(width * ratio);
-      height = Math.round(height * ratio);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(blob => {
-        callback(blob);
-        URL.revokeObjectURL(url);
-      }, "image/jpeg", 0.4);
-    };
-    img.src = url;
-  }
-
-  // ===== Camera capture → compress =====
-  captureBtn.addEventListener('click', () => {
-    if (!videoEl.videoWidth) return;
-    const w = videoEl.videoWidth, h = videoEl.videoHeight;
-    canvasEl.width = w; canvasEl.height = h;
-    const ctx = canvasEl.getContext('2d');
-    ctx.drawImage(videoEl, 0, 0, w, h);
-    canvasEl.toBlob((blob) => {
-      if (!blob) return;
-      resizeAndCompress(blob, (resized) => {
-        const url = URL.createObjectURL(resized);
-        objectUrls.add(url);
-        capturedBlobs.push({ blob: resized, url });
-        addThumbFromUrl(url);
-      });
-    }, 'image/jpeg', 0.8);
-  });
-
-  // ===== File picker → compress =====
-  filePicker.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files || []);
-    for (const f of files) {
-      if (!f.type.startsWith('image/')) continue;
-      resizeAndCompress(f, (resized) => {
-        const url = URL.createObjectURL(resized);
-        objectUrls.add(url);
-        capturedBlobs.push({ blob: resized, url });
-        addThumbFromUrl(url);
-      });
-    }
-    e.target.value = '';
-  });
-
-  switchCamBtn.addEventListener('click', async () => {
-    useBackCamera = !useBackCamera;
-    await startCamera();
-  });
-
-  startCamera();
-  window.addEventListener('beforeunload', () => {
-    objectUrls.forEach(u=>URL.revokeObjectURL(u));
-    if (currentStream) currentStream.getTracks().forEach(t=>t.stop());
-  });
-  window.__getPhotoCount = () => capturedBlobs.length;
-
-  // ===== Enforce single checkbox selection =====
-  function enforceSingleSelection(groupClass){
-    document.querySelectorAll(`.${groupClass}`).forEach(cb=>{
-      cb.addEventListener("change", ()=>{
-        if(cb.checked) document.querySelectorAll(`.${groupClass}`).forEach(other => { if(other!==cb) other.checked=false; });
-      });
+    filePicker.addEventListener('change', e => {
+      const files = Array.from(e.target.files || []);
+      for (const f of files) {
+        if (!f.type.startsWith("image/")) continue;
+        resizeAndCompress(f, resized => {
+          const url = URL.createObjectURL(resized);
+          objectUrls.add(url); capturedBlobs.push({ blob: resized, url });
+          addThumbFromUrl(url);
+        });
+      }
+      e.target.value = "";
     });
-  }
-  enforceSingleSelection("status1-checkbox");
-  enforceSingleSelection("status2-checkbox");
 
-  // ===== SUBMIT (data only, no photo upload) =====
-  document.getElementById('submitBtn').addEventListener('click', async () => {
-    const name = document.getElementById('parcelName').value.trim();
-    const address = document.getElementById('parcelAddress').value.trim();
-    const phone = document.getElementById('parcelPhone').value.trim();
-    const capturer = document.getElementById('capturerName').value.trim();
-    const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
-    const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
-    const role = document.getElementById('role').value || '';
-    const plannedShots = parseInt(document.getElementById('shotCount').value, 10) || 0;
+    switchCamBtn.addEventListener('click', async () => { useBackCamera = !useBackCamera; await startCamera(); });
+    startCamera();
 
-    if (!name || !address || !phone || !capturer) {
-      alert('Please fill all fields!');
-      return;
+    // Expose simple photo count
+    window.__getPhotoCount = () => capturedBlobs.length;
+
+    // ===== Enforce single selection per status group =====
+    function enforceSingleSelection(groupClass){
+      document.querySelectorAll(`.${groupClass}`).forEach(cb=>{
+        cb.addEventListener("change", ()=> {
+          if(cb.checked) document.querySelectorAll(`.${groupClass}`).forEach(other=> { if(other!==cb) other.checked=false; });
+        });
+      });
+    }
+    enforceSingleSelection("status1-checkbox");
+    enforceSingleSelection("status2-checkbox");
+
+    // ===== Rejection fee show/hide logic =====
+    const status1Checkboxes = Array.from(document.querySelectorAll('.status1-checkbox'));
+    const rejectionFeeWrap = document.getElementById('rejectionFeeWrap');
+    function updateRejectionFeeVisibility() {
+      const rejectedChecked = status1Checkboxes.some(cb => cb.value === 'Rejected' && cb.checked);
+      if (rejectedChecked) rejectionFeeWrap.classList.remove('hidden');
+      else { rejectionFeeWrap.classList.add('hidden'); const feeEl = document.getElementById('rejectionFee'); if (feeEl) feeEl.value = ''; }
+    }
+    status1Checkboxes.forEach(cb => cb.addEventListener('change', updateRejectionFeeVisibility));
+    updateRejectionFeeVisibility();
+
+    // ===== Submit Parcel (saves rejectionFee when applicable) =====
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+      const name = document.getElementById('parcelName').value.trim();
+      const address = document.getElementById('parcelAddress').value.trim();
+      const phone = document.getElementById('parcelPhone').value.trim();
+      const sender = document.getElementById('senderName').value.trim();
+      const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
+      const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
+
+      if (!name || !address || !phone || !sender) {
+        alert('Please fill all required fields!');
+        return;
+      }
+
+      // If rejected, require fee
+      const isRejected = status1 === 'Rejected';
+      let rejectionFee = null;
+      if (isRejected) {
+        const feeRaw = (document.getElementById('rejectionFee').value || '').trim();
+        if (feeRaw === '') { alert('Please enter rejection fee (GHS) for rejected parcel.'); return; }
+        rejectionFee = parseFloat(feeRaw);
+        if (!isFinite(rejectionFee) || rejectionFee < 0) { alert('Enter a valid rejection fee amount.'); return; }
+      }
+
+      const submitBtn = document.getElementById('submitBtn');
+      const prevText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+
+      try {
+        const payload = {
+          name, address, phone,
+          sender,
+          capturerId: user.userId,
+          capturerName: user.name,
+          role: user.role,
+          status1, status2,
+          photoCount: capturedBlobs.length,
+          timestamp: serverTimestamp()
+        };
+        if (isRejected && rejectionFee !== null) payload.rejectionFee = rejectionFee;
+
+        await addDoc(collection(db, "parcels"), payload);
+
+        submitBtn.textContent = 'Saved ✓';
+        setTimeout(()=>{ submitBtn.textContent = prevText; submitBtn.disabled = false; }, 900);
+
+        // Clear form + previews
+        document.getElementById('parcelName').value = '';
+        document.getElementById('parcelAddress').value = '';
+        document.getElementById('parcelPhone').value = '';
+        document.getElementById('senderName').value = '';
+        document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
+        updateRejectionFeeVisibility();
+        objectUrls.forEach(u => URL.revokeObjectURL(u));
+        objectUrls.clear();
+        thumbs.innerHTML = '';
+        capturedBlobs = [];
+      } catch (err) {
+        console.error("Error saving to Firestore:", err);
+        alert('Save failed: ' + (err?.message || 'unknown error'));
+        submitBtn.disabled = false;
+        submitBtn.textContent = prevText;
+      }
+    });
+
+    // ===== History: only show entries for this user (capturerId === user.userId) =====
+    const latestHistory = document.getElementById("latestHistory");
+    const historyList = document.getElementById("historyList");
+    const toggleHistory = document.getElementById("toggleHistory");
+
+    function renderHistoryItem(data) {
+      const time = data.timestamp?.toDate?.().toLocaleString() || "";
+      const photoCount = data.photoCount || 0;
+      const s1 = data.status1 || "—";
+      const s2 = data.status2 || "—";
+      const feeHtml = (data.rejectionFee !== undefined && data.rejectionFee !== null && isFinite(data.rejectionFee))
+        ? `<p class="text-xs text-red-600">Rejection Fee: GHS ${Number(data.rejectionFee).toFixed(2)}</p>`
+        : "";
+      const div = document.createElement("div");
+      div.className = "p-3 border-b border-gray-200";
+      div.innerHTML = `
+        <div class="flex justify-between items-center">
+          <h3 class="font-semibold text-gray-900">${escapeHtml(data.name)}</h3>
+          <span class="text-xs text-gray-500">${time}</span>
+        </div>
+        <p class="text-sm text-gray-600">${escapeHtml(data.address)}</p>
+        <p class="text-xs text-gray-500">📞 ${escapeHtml(data.phone || '')}</p>
+        <p class="text-xs text-gray-500">Sent by: ${escapeHtml(data.sender || '—')} | Captured by: ${escapeHtml(data.capturerName || '')} (${escapeHtml(data.role || '')})</p>
+        <p class="text-xs text-gray-500">📷 ${photoCount} photos</p>
+        <p class="text-xs text-gray-500">Status 1: ${escapeHtml(s1)} | Status 2: ${escapeHtml(s2)}</p>
+        ${feeHtml}
+      `;
+      return div;
     }
 
-    const submitBtn = document.getElementById('submitBtn');
-    const prevText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving...';
+    // small helper to avoid injecting raw HTML from data
+    function escapeHtml(str) {
+      if (!str && str !== 0) return '';
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
 
-    try {
-      await addDoc(collection(db, "parcels"), {
-        name, address, phone, capturer, role,
-        status1, status2,
-        plannedShots,
-        photoCount: capturedBlobs.length,  // ✅ only count photos
-        createdByUid: auth.currentUser?.uid || null,
-        createdByEmail: auth.currentUser?.email || null,
-        timestamp: serverTimestamp()
+    // Query only parcels created by this logged-in user
+    const parcelsQuery = query(collection(db, "parcels"), where("capturerId", "==", user.userId));
+    onSnapshot(parcelsQuery, (snapshot) => {
+      // convert docs to array with data, then sort descending by timestamp (client-side)
+      const docs = snapshot.docs.map(d => ({ id: d.id, data: d.data() }));
+      docs.sort((a,b) => {
+        const at = a.data.timestamp?.toMillis ? a.data.timestamp.toMillis() : 0;
+        const bt = b.data.timestamp?.toMillis ? b.data.timestamp.toMillis() : 0;
+        return bt - at;
       });
 
-      submitBtn.textContent = 'Saved ✓';
-      setTimeout(() => { submitBtn.textContent = prevText; submitBtn.disabled = false; }, 900);
-
-      // Clear form + previews
-      document.getElementById('parcelName').value = '';
-      document.getElementById('parcelAddress').value = '';
-      document.getElementById('parcelPhone').value = '';
-      document.getElementById('capturerName').value = '';
-      document.getElementById('shotCount').value = '1';
-      document.getElementById('role').value = 'Marketer';
-      document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
-      objectUrls.forEach(u => URL.revokeObjectURL(u));
-      objectUrls.clear();
-      thumbs.innerHTML = '';
-      capturedBlobs = [];
-
-    } catch (err) {
-      console.error("Error saving to Firestore:", err);
-      alert('Save failed: ' + (err?.message || 'unknown error'));
-      submitBtn.disabled = false;
-      submitBtn.textContent = prevText;
-    }
-  });
-
-
-// ====== HISTORY DISPLAY ======import { query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-const latestHistory = document.getElementById("latestHistory");
-const historyList = document.getElementById("historyList");
-const toggleHistory = document.getElementById("toggleHistory");
-
-function renderHistoryItem(doc) {
-  const data = doc.data();
-  const div = document.createElement("div");
-  div.className = "p-3 border-b border-gray-200 dark:border-gray-700";
-
-  const time = data.timestamp?.toDate?.().toLocaleString() || "";
-  div.innerHTML = `
-    <div class="flex justify-between items-center">
-      <h3 class="font-semibold text-gray-900 dark:text-gray-100">${data.name}</h3>
-      <span class="text-xs text-gray-500">${time}</span>
-    </div>
-    <p class="text-sm text-gray-600 dark:text-gray-300">${data.address}</p>
-    <p class="text-xs text-gray-500">📷 ${data.photoCount} | ${data.status1 || ''} ${data.status2 || ''}</p>
-  `;
-  return div;
-}
-
-// Toggle show/hide history
-let showAll = false;
-toggleHistory.addEventListener("click", () => {
-  showAll = !showAll;
-  if (showAll) {
-    historyList.classList.remove("hidden");
-    toggleHistory.textContent = "Hide";
-  } else {
-    historyList.classList.add("hidden");
-    toggleHistory.textContent = "Show All";
-  }
-});
-
-// Load history
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    const q = query(collection(db, "parcels"), orderBy("timestamp", "desc"));
-    onSnapshot(q, (snapshot) => {
       latestHistory.innerHTML = "";
       historyList.innerHTML = "";
-
       let first = true;
-      snapshot.forEach((doc) => {
-        const item = renderHistoryItem(doc);
-        if (first) {
-          latestHistory.appendChild(item);
-          first = false;
-        } else {
-          historyList.appendChild(item);
-        }
-      });
+      for (const item of docs) {
+        const node = renderHistoryItem(item.data);
+        if (first) { latestHistory.appendChild(node); first = false; }
+        else historyList.appendChild(node);
+      }
     });
-  }
-});
+
+    // Toggle show/hide history list (keeps same UI)
+    let showAll = false;
+    toggleHistory.addEventListener("click", () => {
+      showAll = !showAll;
+      if (showAll) {
+        historyList.classList.remove("hidden");
+        toggleHistory.textContent = "Hide";
+      } else {
+        historyList.classList.add("hidden");
+        toggleHistory.textContent = "Show All";
+      }
+    });
 
 
-const officerBtn = document.getElementById('officerBtn');
-const pinModal = document.getElementById('pinModal');
-const officerPinInput = document.getElementById('officerPinInput');
-const submitPinBtn = document.getElementById('submitPinBtn');
-const cancelPinBtn = document.getElementById('cancelPinBtn');
-const pinError = document.getElementById('pinError');
+    // ===== Officer PIN logic =====
+const officerBtn = document.createElement("button");
+officerBtn.textContent = "Officer Dashboard";
+officerBtn.className = "px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs sm:text-sm hover:bg-blue-700";
+document.querySelector("header .flex.items-center").prepend(officerBtn);
 
-const correctPin = "1234"; // Secret PIN
+const pinModal = document.getElementById("pinModal");
+const officerPinInput = document.getElementById("officerPinInput");
+const submitPinBtn = document.getElementById("submitPinBtn");
+const cancelPinBtn = document.getElementById("cancelPinBtn");
+const pinError = document.getElementById("pinError");
 
-officerBtn.addEventListener('click', (e) => {
+const correctPin = "1234"; // 🔐 Change this to your secret PIN
+
+officerBtn.addEventListener("click", (e) => {
   e.preventDefault();
   officerPinInput.value = "";
-  pinError.classList.add('hidden');
-  pinModal.classList.remove('hidden');
+  pinError.classList.add("hidden");
+  pinModal.classList.remove("hidden");
   officerPinInput.focus();
 });
 
-cancelPinBtn.addEventListener('click', () => {
-  pinModal.classList.add('hidden');
+cancelPinBtn.addEventListener("click", () => {
+  pinModal.classList.add("hidden");
 });
 
-submitPinBtn.addEventListener('click', () => {
-  const enteredPin = officerPinInput.value.trim();
-  if (enteredPin === correctPin) {
+submitPinBtn.addEventListener("click", () => {
+  if (officerPinInput.value.trim() === correctPin) {
+    pinModal.classList.add("hidden");
     window.location.href = "officer.html";
   } else {
-    pinError.classList.remove('hidden');
+    pinError.classList.remove("hidden");
     officerPinInput.value = "";
     officerPinInput.focus();
   }
 });
 
-// Optional: allow Enter key to submit PIN
-officerPinInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') submitPinBtn.click();
+// Allow Enter key
+officerPinInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") submitPinBtn.click();
 });
 
-</script>
 
-
+  </script>
 </body>
 </html>

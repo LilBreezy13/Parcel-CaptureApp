@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Setup Users - Parcel App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center px-4">
+
+  <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-8 space-y-6">
+    <h1 class="text-2xl font-bold text-center text-gray-800">User Setup</h1>
+    <p class="text-gray-600 text-center">Click the button below to create users in Firestore.</p>
+    <button id="createBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold">Create Users</button>
+    <div id="output" class="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg h-64 overflow-y-auto"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // ==== Your Firebase config (same as index.html) ====
+    const firebaseConfig = {
+      apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
+      authDomain: "employee-app-c781d.firebaseapp.com",
+      projectId: "employee-app-c781d",
+      storageBucket: "employee-app-c781d.appspot.com",
+      messagingSenderId: "232631444018",
+      appId: "1:232631444018:web:37b70fe37975abcc1b922b"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // ==== Define your users here ====
+    const users = [
+      { userId: "MKT001", name: "John Marketer", role: "Marketer", password: "mktpass1" },
+      { userId: "MKT002", name: "Mary Marketer", role: "Marketer", password: "mktpass2" },
+      { userId: "MGMT001", name: "Alice Manager", role: "Management", password: "mgmtpass" },
+      { userId: "OA001", name: "Bob Assistant", role: "Office Assistant", password: "oapass" }
+    ];
+
+    // Hash function
+    async function sha256hex(message) {
+      const msgUint8 = new TextEncoder().encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+
+    // Create users in Firestore
+    document.getElementById("createBtn").addEventListener("click", async () => {
+      const output = document.getElementById("output");
+      output.textContent = "Starting user creation...\n";
+
+      for (const u of users) {
+        const hash = await sha256hex(u.password);
+        try {
+          await setDoc(doc(db, "users", u.userId), {
+            userId: u.userId,
+            name: u.name,
+            role: u.role,
+            passwordHash: hash
+          });
+          output.textContent += `✅ Created ${u.userId} (${u.role})\n`;
+        } catch (err) {
+          output.textContent += `❌ Error for ${u.userId}: ${err.message}\n`;
+        }
+      }
+
+      output.textContent += "\nDone! You can now log in via index.html";
+    });
+  </script>
+</body>
+</html>
