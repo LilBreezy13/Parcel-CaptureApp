@@ -343,13 +343,14 @@ html.light aside {
     <th class="border border-white/10 p-2">Contact</th>
     <th class="border border-white/10 p-2">Address</th>
     <th class="border border-white/10 p-2">Status 02</th>
-    <th class="border border-white/10 p-2">Paid</th>
+    <th class="border border-white/10 p-2">Status 01</th>
+    <!-- <th class="border border-white/10 p-2">Paid</th>
     <th class="border border-white/10 p-2">Part Payment</th>
-    <th class="border border-white/10 p-2">Not Paid</th>
+    <th class="border border-white/10 p-2">Not Paid</th> -->
     <th class="border border-white/10 p-2">Rejected Amount</th>
 <th class="border border-white/10 p-2">Date</th>
 
-    <th class="border border-white/10 p-2">Date</th>
+ 
   </tr>
 </thead>
 
@@ -1071,6 +1072,7 @@ document.addEventListener('DOMContentLoaded', () => {
   contact: d.contact || d.phone || '—',
   address: d.address || '—',
   status02: d.status2 || d.status1 || '—',   // ✅ fix naming
+  status01: d.status1 || d.status2 || '—',   // ✅ fix naming
   paid: d.paid || '—',
   partPayment: d.part_payment || '—',
   notPaid: d.not_paid || '—',
@@ -1088,13 +1090,12 @@ reportsTableBody.innerHTML = rows.length
         <td class="p-2 border border-gray-700">${r.contact}</td>
         <td class="p-2 border border-gray-700">${r.address}</td>
         <td class="p-2 border border-gray-700">${r.status02}</td>
-        <td class="p-2 border border-gray-700">${r.paid}</td>
-        <td class="p-2 border border-gray-700">${r.partPayment}</td>
-        <td class="p-2 border border-gray-700">${r.notPaid}</td>
+        <td class="p-2 border border-gray-700">${r.status01}</td>
+      
        <td class="p-2 border border-gray-700">${r.rejectionFee}</td>
 <td class="p-2 border border-gray-700">${r.date}</td>
 
-        <td class="p-2 border border-gray-700">${r.date}</td>
+       
       </tr>
     `).join('')
   : '<tr><td colspan="11" class="text-center p-4">No records</td></tr>';
