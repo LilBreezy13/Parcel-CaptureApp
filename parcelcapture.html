@@ -77,6 +77,13 @@
       <div class="relative w-full">
         <video id="camera" class="w-full rounded-lg bg-black h-48 sm:h-64 object-cover" autoplay playsinline muted></video>
         <canvas id="snapshotCanvas" class="hidden"></canvas>
+
+        <div id="scannerOverlay"
+     class="absolute inset-0 flex items-center justify-center pointer-events-none">
+  <div class="border-4 border-green-500 rounded-lg w-3/4 h-2/3"></div>
+</div>
+
+
         <div class="absolute top-2 right-2 flex gap-2">
           <button id="switchCam" type="button" class="px-2 py-1 text-xs sm:text-sm bg-white/80 backdrop-blur rounded-md shadow hover:bg-white">🔄</button>
           <label for="filePicker" class="px-2 py-1 text-xs sm:text-sm bg-white/80 backdrop-blur rounded-md shadow hover:bg-white cursor-pointer">📁</label>
@@ -208,442 +215,389 @@
   <div id="mobileUserInfo" class="mt-1 block sm:hidden text-gray-800 font-medium"></div>
 </footer>
 
-  <!-- Scripts -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-   import {
-  getFirestore, collection, addDoc, serverTimestamp,
-  query, where, onSnapshot
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <!-- Scripts --><script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, serverTimestamp,
+    query, where, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    getStorage, ref as storageRef, uploadBytes, getDownloadURL
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-import {
-  getStorage, ref as storageRef, uploadBytes, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
-
-    // ===== Firebase config (your project) =====
-    const firebaseConfig = {
-      apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
-      authDomain: "employee-app-c781d.firebaseapp.com",
-      projectId: "employee-app-c781d",
-      storageBucket: "employee-app-c781d.appspot.com",
-      messagingSenderId: "232631444018",
-      appId: "1:232631444018:web:37b70fe37975abcc1b922b"
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const storage = getStorage(app);
+  // ===== Firebase config (your project) =====
+  const firebaseConfig = {
+    apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
+    authDomain: "employee-app-c781d.firebaseapp.com",
+    projectId: "employee-app-c781d",
+    storageBucket: "employee-app-c781d.appspot.com",
+    messagingSenderId: "232631444018",
+    appId: "1:232631444018:web:37b70fe37975abcc1b922b"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const storage = getStorage(app, "gs://employee-app-c781d.firebasestorage.app");
 
 
-    // ===== Load logged-in user from sessionStorage (no Firebase Auth) =====
-    const user = (() => {
-      try { return JSON.parse(sessionStorage.getItem("user")); } catch { return null; }
-    })();
-    if (!user || !user.userId) {
-      // not logged in
-      window.location.href = "index.html";
-    } else {
-      document.getElementById("userInfo").textContent = `${user.name} (${user.userId}) - ${user.role}`;
-      document.getElementById("capturerName").value = `${user.name} (${user.userId})`;
-      // Show user info under footer on mobile
-document.getElementById("mobileUserInfo").textContent =
-  `Parcel Capture ${user.name} (${user.userId}) - ${user.role}`;
+  // ===== Load logged-in user from sessionStorage =====
+  const user = (() => {
+    try { return JSON.parse(sessionStorage.getItem("user")); } catch { return null; }
+  })();
+  if (!user || !user.userId) {
+    window.location.href = "index.html";
+  } else {
+    document.getElementById("userInfo").textContent = `${user.name} (${user.userId}) - ${user.role}`;
+    document.getElementById("capturerName").value = `${user.name} (${user.userId})`;
+    document.getElementById("mobileUserInfo").textContent =
+      `Parcel Capture ${user.name} (${user.userId}) - ${user.role}`;
+  }
 
-      // set the role dropdown to the user's role (keeps your old UI)
-      const roleEl = document.getElementById("role");
-      if (roleEl) roleEl.value = user.role || roleEl.value;
+  // ===== Sign out =====
+  document.getElementById("signOutBtn").addEventListener("click", () => {
+    sessionStorage.removeItem("user");
+    window.location.href = "index.html";
+  });
+
+  // ===== Camera setup =====
+  const videoEl = document.getElementById('camera');
+  const canvasEl = document.getElementById('snapshotCanvas');
+  const thumbs = document.getElementById('thumbs');
+  const captureBtn = document.getElementById('captureBtn');
+  const filePicker = document.getElementById('filePicker');
+  const switchCamBtn = document.getElementById('switchCam');
+
+  let currentStream = null;
+  let useBackCamera = true;
+  let capturedBlobs = [];
+  const objectUrls = new Set();
+
+  async function startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      document.getElementById('cameraHint').textContent = 'Camera not available. Use 📁 to select a photo.';
+      return;
     }
-
-    // ===== Sign out =====
-    document.getElementById("signOutBtn").addEventListener("click", () => {
-      sessionStorage.removeItem("user");
-      window.location.href = "index.html";
-    });
-
-    // ===== Camera & thumbnails (unchanged logic) =====
-    const videoEl = document.getElementById('camera');
-    const canvasEl = document.getElementById('snapshotCanvas');
-    const thumbs = document.getElementById('thumbs');
-    const captureBtn = document.getElementById('captureBtn');
-    const filePicker = document.getElementById('filePicker');
-    const switchCamBtn = document.getElementById('switchCam');
-
-    let currentStream = null;
-    let useBackCamera = true;
-    let capturedBlobs = [];
-    const objectUrls = new Set();
-
-    async function startCamera() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        document.getElementById('cameraHint').textContent = 'Camera not available. Use 📁 to select a photo.';
-        return;
-      }
-      if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+    if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+    try {
+      currentStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
+        audio: false
+      });
+    } catch {
       try {
         currentStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
+          video: { facingMode: useBackCamera ? 'environment' : 'user' },
           audio: false
         });
-      } catch {
-        try {
-          currentStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: useBackCamera ? 'environment' : 'user' },
-            audio: false
-          });
-        } catch (err) {
-          console.warn('Camera failed, use file picker instead', err);
-          document.getElementById('cameraHint').textContent = 'Could not access camera. Use 📁 instead.';
-          return;
-        }
+      } catch (err) {
+        console.warn('Camera failed, use file picker instead', err);
+        document.getElementById('cameraHint').textContent = 'Could not access camera. Use 📁 instead.';
+        return;
       }
-      videoEl.srcObject = currentStream;
     }
-
-    function addThumbFromUrl(url) {
-      const wrap = document.createElement('div');
-      wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
-      const img = document.createElement('img');
-      img.src = url; img.alt = 'shot'; img.className = 'w-full h-full object-cover rounded-lg border';
-      const rm = document.createElement('button');
-      rm.type = 'button';
-      rm.className = 'absolute -top-1 -right-1 text-xs bg-black/70 text-white rounded-full px-1';
-      rm.textContent = '✖';
-      rm.addEventListener('click', () => {
-        wrap.remove();
-        if (objectUrls.has(img.src)) { URL.revokeObjectURL(img.src); objectUrls.delete(img.src); }
-        capturedBlobs = capturedBlobs.filter(b => b.url !== url);
-      });
-      wrap.appendChild(img); wrap.appendChild(rm); thumbs.appendChild(wrap);
-    }
-// Capture frame, compress, and keep full-res crop for OCR
-async function captureFrameCompressed(videoEl, maxW = 1200, maxH = 900, quality = 0.45) {
-  const full = document.createElement('canvas');
-  full.width = videoEl.videoWidth;
-  full.height = videoEl.videoHeight;
-  full.getContext('2d').drawImage(videoEl, 0, 0);
-
-  // compress
-  const ratio = Math.min(1, maxW / full.width, maxH / full.height);
-  const outW = Math.round(full.width * ratio);
-  const outH = Math.round(full.height * ratio);
-  const out = document.createElement('canvas');
-  out.width = outW; out.height = outH;
-  out.getContext('2d').drawImage(full, 0, 0, full.width, full.height, 0, 0, outW, outH);
-  const dataUrl = out.toDataURL('image/jpeg', quality);
-  const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', quality));
-
-  return { blob, dataUrl, cropFull: full };
-}
-
-function addThumb(dataUrl, aligned) {
-  const wrap = document.createElement('div');
-  wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
-  const img = document.createElement('img');
-  img.src = dataUrl; img.className = 'w-full h-full object-cover rounded-lg border';
-  const badge = document.createElement('div');
-  badge.className = 'absolute -top-1 -left-1 px-1 text-xs rounded-full text-white';
-  badge.style.background = aligned ? 'green' : 'red';
-  badge.textContent = aligned ? '✓' : '✖';
-  wrap.appendChild(img); wrap.appendChild(badge);
-  thumbs.appendChild(wrap);
-}
-
-captureBtn.addEventListener('click', async () => {
-  const shots = Number(document.getElementById('shotCount').value || 1);
-  const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
-  if (status1 === 'Rejected' && shots > 1) {
-    alert("Rejected parcels can only be captured one at a time.");
-    return;
+    videoEl.srcObject = currentStream;
   }
 
-  capturedBlobs = [];
-  thumbs.innerHTML = "";
+  function addThumbFromUrl(url) {
+    const wrap = document.createElement('div');
+    wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'shot';
+    img.className = 'w-full h-full object-cover rounded-lg border';
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'absolute -top-1 -right-1 text-xs bg-black/70 text-white rounded-full px-1';
+    rm.textContent = '✖';
+    rm.addEventListener('click', () => {
+      wrap.remove();
+      if (objectUrls.has(img.src)) {
+        URL.revokeObjectURL(img.src);
+        objectUrls.delete(img.src);
+      }
+      capturedBlobs = capturedBlobs.filter(b => b.url !== url);
+    });
+    wrap.appendChild(img);
+    wrap.appendChild(rm);
+    thumbs.appendChild(wrap);
+  }
+
+  // ===== Capture (multi-shot) =====
+  async function captureFrame(videoEl, maxW = 800, maxH = 600, quality = 0.5) {
+    const canvas = document.createElement('canvas');
+    canvas.width = videoEl.videoWidth;
+    canvas.height = videoEl.videoHeight;
+    canvas.getContext('2d').drawImage(videoEl, 0, 0);
+
+    const ratio = Math.min(1, maxW / canvas.width, maxH / canvas.height);
+    const outW = Math.round(canvas.width * ratio);
+    const outH = Math.round(canvas.height * ratio);
+
+    const out = document.createElement('canvas');
+    out.width = outW;
+    out.height = outH;
+    out.getContext('2d').drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, outW, outH);
+
+    const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', quality));
+    const url = URL.createObjectURL(blob);
+    return { blob, url };
+  }
+
+  captureBtn.addEventListener('click', async () => {
+    const shots = Number(document.getElementById('shotCount').value || 1);
+    const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
+
+    if (status1 === 'Rejected' && shots > 1) {
+      alert("Rejected parcels can only be captured one at a time.");
+      return;
+    }
+
+    capturedBlobs = [];
+    thumbs.innerHTML = "";
 
   for (let i = 0; i < shots; i++) {
-    const { blob, dataUrl, cropFull } = await captureFrameCompressed(videoEl);
-    const aligned = true; // (basic alignment check; can refine later)
-    addThumb(dataUrl, aligned);
-    capturedBlobs.push({ blob, dataUrl, cropFull, aligned });
+  const { blob, url } = await captureFrame(videoEl);
+  capturedBlobs.push({ blob, url });
+  addThumbFromUrl(url);
+
+  // Flash scanner overlay green
+  const overlay = document.querySelector('#scannerOverlay div');
+  overlay.classList.add('bg-green-200/30');
+  setTimeout(() => overlay.classList.remove('bg-green-200/30'), 200);
+
+  // OCR only on the first shot
+  if (i === 0) {
+    Tesseract.recognize(blob, 'eng', { logger: m => console.log(m) })
+      .then(({ data: { text } }) => {
+        console.log("OCR result:", text);
+
+        // Try to auto-fill fields
+        const nameMatch = text.match(/Name[:\s]*(.+)/i);
+        const addrMatch = text.match(/Address[:\s]*(.+)/i);
+        const phoneMatch = text.match(/(\+?\d[\d\s-]{7,})/);
+
+        if (nameMatch) document.getElementById('parcelName').value = nameMatch[1].trim();
+        if (addrMatch) document.getElementById('parcelAddress').value = addrMatch[1].trim();
+        if (phoneMatch) document.getElementById('parcelPhone').value = phoneMatch[1].trim();
+      })
+      .catch(err => console.error("OCR failed", err));
   }
-});
+}
 
-    filePicker.addEventListener('change', e => {
-      const files = Array.from(e.target.files || []);
-      for (const f of files) {
-        if (!f.type.startsWith("image/")) continue;
-        resizeAndCompress(f, resized => {
-          const url = URL.createObjectURL(resized);
-          objectUrls.add(url); capturedBlobs.push({ blob: resized, url });
-          addThumbFromUrl(url);
-        });
-      }
-      e.target.value = "";
-    });
 
-    switchCamBtn.addEventListener('click', async () => { useBackCamera = !useBackCamera; await startCamera(); });
-    startCamera();
+    // Run OCR on the first captured image only (to avoid slowdowns with multi-shot)
+if (i === 0) {
+  Tesseract.recognize(blob, 'eng', { logger: m => console.log(m) })
+    .then(({ data: { text } }) => {
+      console.log("OCR result:", text);
 
-    // Expose simple photo count
-    window.__getPhotoCount = () => capturedBlobs.length;
+      // Simple extraction (you can tune this regex later)
+      const nameMatch = text.match(/Name[:\s]*(.+)/i);
+      const addrMatch = text.match(/Address[:\s]*(.+)/i);
+      const phoneMatch = text.match(/(\+?\d[\d\s-]{7,})/);
 
-    // ===== Enforce single selection per status group =====
-    function enforceSingleSelection(groupClass){
-      document.querySelectorAll(`.${groupClass}`).forEach(cb=>{
-        cb.addEventListener("change", ()=> {
-          if(cb.checked) document.querySelectorAll(`.${groupClass}`).forEach(other=> { if(other!==cb) other.checked=false; });
-        });
-      });
+      if (nameMatch) document.getElementById('parcelName').value = nameMatch[1].trim();
+      if (addrMatch) document.getElementById('parcelAddress').value = addrMatch[1].trim();
+      if (phoneMatch) document.getElementById('parcelPhone').value = phoneMatch[1].trim();
+    })
+    .catch(err => console.error("OCR failed", err));
+}
+
+    const overlay = document.querySelector('#scannerOverlay div');
+overlay.classList.add('bg-green-200/30');
+setTimeout(() => overlay.classList.remove('bg-green-200/30'), 200);
+
+  });
+
+  // ===== File Picker (with compression) =====
+  filePicker.addEventListener('change', async e => {
+    const files = Array.from(e.target.files || []);
+    for (const f of files) {
+      if (!f.type.startsWith("image/")) continue;
+      const img = await createImageBitmap(f);
+      const canvas = document.createElement("canvas");
+      const maxW = 800, maxH = 600;
+      let { width, height } = img;
+      const ratio = Math.min(maxW / width, maxH / height, 1);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.5));
+      const url = URL.createObjectURL(blob);
+      capturedBlobs.push({ blob, url });
+      addThumbFromUrl(url);
     }
-    enforceSingleSelection("status1-checkbox");
-    enforceSingleSelection("status2-checkbox");
+    e.target.value = "";
+  });
 
-    // ===== Rejection fee show/hide logic =====
-    const status1Checkboxes = Array.from(document.querySelectorAll('.status1-checkbox'));
-    const rejectionFeeWrap = document.getElementById('rejectionFeeWrap');
-    function updateRejectionFeeVisibility() {
-      const rejectedChecked = status1Checkboxes.some(cb => cb.value === 'Rejected' && cb.checked);
-      if (rejectedChecked) rejectionFeeWrap.classList.remove('hidden');
-      else { rejectionFeeWrap.classList.add('hidden'); const feeEl = document.getElementById('rejectionFee'); if (feeEl) feeEl.value = ''; }
+  switchCamBtn.addEventListener('click', async () => {
+    useBackCamera = !useBackCamera;
+    await startCamera();
+  });
+  startCamera();
+
+  // ===== Submit handler =====
+  document.getElementById('submitBtn').addEventListener('click', async () => {
+    const name = document.getElementById('parcelName').value.trim();
+    const address = document.getElementById('parcelAddress').value.trim();
+    const phone = document.getElementById('parcelPhone').value.trim();
+    const sender = document.getElementById('senderName').value.trim();
+    const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
+    const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
+
+    if (!name || !address || !phone || !sender) {
+      alert("Please fill all required fields!");
+      return;
     }
-    status1Checkboxes.forEach(cb => cb.addEventListener('change', updateRejectionFeeVisibility));
-    updateRejectionFeeVisibility();
 
-    // ===== Submit Parcel (saves rejectionFee when applicable) =====
-   document.getElementById('submitBtn').addEventListener('click', async () => {
-  const nameEl = document.getElementById('parcelName');
-  const addrEl = document.getElementById('parcelAddress');
-  const phoneEl = document.getElementById('parcelPhone');
-  const senderEl = document.getElementById('senderName');
-  const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
-  const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
+    if (status1 === "Rejected" && capturedBlobs.length > 1) {
+      alert("Rejected parcels can only be captured one at a time.");
+      return;
+    }
 
-  if (!senderEl.value.trim()) {
-    alert('Please enter sender');
-    return;
-  }
-  if (status1 === 'Rejected' && capturedBlobs.length > 1) {
-    alert("Rejected must be single shot");
-    return;
-  }
+    const submitBtn = document.getElementById("submitBtn");
+    const prevText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Saving...";
 
-  const submitBtn = document.getElementById('submitBtn');
-  const prev = submitBtn.textContent;
-  submitBtn.disabled = true;
-  submitBtn.textContent = "Saving...";
+    try {
+      const uploadedUrls = [];
+      console.log("Uploading", capturedBlobs.length, "images");
 
-  try {
-    for (const item of capturedBlobs) {
-      // upload to Storage
-      const ts = Date.now();
-      const fileName = `parcels/${user.userId}_${ts}.jpg`;
-      const ref = storageRef(storage, fileName);
-      await uploadBytes(ref, item.blob);
-      const url = await getDownloadURL(ref);
-
-      // run OCR only if fields are empty
-      if ((!nameEl.value || !addrEl.value || !phoneEl.value)) {
-        const blob = await new Promise(r => item.cropFull.toBlob(r, 'image/png'));
-        const { data: { text } } = await Tesseract.recognize(blob, 'eng');
-        const ocrText = (text || "").trim();
-        if (!phoneEl.value) {
-          const m = ocrText.match(/(\+?\d{8,15})/);
-          if (m) phoneEl.value = m[1];
-        }
-        const lines = ocrText.split(/\n/).map(s => s.trim()).filter(Boolean);
-        if (!nameEl.value && lines[0]) nameEl.value = lines[0];
-        if (!addrEl.value && lines.length > 1) addrEl.value = lines.slice(1, 3).join(", ");
+      for (let i = 0; i < capturedBlobs.length; i++) {
+        const item = capturedBlobs[i];
+        const ts = Date.now();
+        const fileName = `parcels/${user.userId}_${ts}_${i}.jpg`;
+        const ref = storageRef(storage, fileName);
+        console.log("Uploading", fileName);
+        await uploadBytes(ref, item.blob);
+        const url = await getDownloadURL(ref);
+        uploadedUrls.push(url);
+        console.log("Got URL:", url);
       }
 
       const payload = {
-        name: nameEl.value.trim(),
-        address: addrEl.value.trim(),
-        phone: phoneEl.value.trim(),
-        sender: senderEl.value.trim(),
+        name, address, phone, sender,
         capturerId: user.userId,
         capturerName: user.name,
         role: user.role,
         status1, status2,
-        photos: [url],
+        photoCount: uploadedUrls.length,
+        photos: uploadedUrls,
         timestamp: serverTimestamp()
       };
 
-      if (status1 === 'Rejected') {
-        const fee = document.getElementById('rejectionFee').value;
-        if (!fee) { alert("Enter rejection fee"); submitBtn.disabled = false; submitBtn.textContent = prev; return; }
-        payload.rejectionFee = parseFloat(fee);
+      if (status1 === "Rejected") {
+        const feeRaw = document.getElementById("rejectionFee").value;
+        if (!feeRaw) {
+          alert("Please enter rejection fee");
+          submitBtn.disabled = false;
+          submitBtn.textContent = prevText;
+          return;
+        }
+        payload.rejectionFee = parseFloat(feeRaw);
       }
 
       await addDoc(collection(db, "parcels"), payload);
-    }
+      console.log("Saved Firestore doc");
 
-    submitBtn.textContent = "Saved ✓";
-    setTimeout(() => { submitBtn.textContent = prev; submitBtn.disabled = false; }, 900);
-    // reset
-    nameEl.value = addrEl.value = phoneEl.value = senderEl.value = "";
-    thumbs.innerHTML = "";
-    capturedBlobs = [];
-  } catch (e) {
-    console.error(e);
-    alert("Save failed: " + e.message);
-    submitBtn.disabled = false;
-    submitBtn.textContent = prev;
+      submitBtn.textContent = "Saved ✓";
+      setTimeout(() => {
+        submitBtn.textContent = prevText;
+        submitBtn.disabled = false;
+      }, 800);
+
+      // reset form
+      document.getElementById('parcelName').value = '';
+      document.getElementById('parcelAddress').value = '';
+      document.getElementById('parcelPhone').value = '';
+      document.getElementById('senderName').value = '';
+      document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
+      document.getElementById('rejectionFee').value = '';
+      thumbs.innerHTML = '';
+      capturedBlobs = [];
+
+    } catch (err) {
+      console.error("Save failed:", err);
+      alert("Save failed: " + err.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = prevText;
+    }
+  });
+
+  // ===== History (same as before) =====
+  function renderHistoryItem(data) {
+    const time = data.timestamp?.toDate?.().toLocaleString() || "";
+    const photoCount = data.photoCount || 0;
+    const s1 = data.status1 || "—";
+    const s2 = data.status2 || "—";
+    const feeHtml = (data.rejectionFee !== undefined && data.rejectionFee !== null && isFinite(data.rejectionFee))
+      ? `<p class="text-xs text-red-600">Rejection Fee: GHS ${Number(data.rejectionFee).toFixed(2)}</p>`
+      : "";
+    const div = document.createElement("div");
+    div.className = "p-3 border-b border-gray-200";
+    div.innerHTML = `
+      <div class="flex justify-between items-center">
+        <h3 class="font-semibold text-gray-900">${escapeHtml(data.name)}</h3>
+        <span class="text-xs text-gray-500">${time}</span>
+      </div>
+      <p class="text-sm text-gray-600">${escapeHtml(data.address)}</p>
+      <p class="text-xs text-gray-500">📞 ${escapeHtml(data.phone || '')}</p>
+      <p class="text-xs text-gray-500">Sent by: ${escapeHtml(data.sender || '—')} | Captured by: ${escapeHtml(data.capturerName || '')} (${escapeHtml(data.role || '')})</p>
+      <p class="text-xs text-gray-500">📷 ${photoCount} photos</p>
+      <p class="text-xs text-gray-500">Status 1: ${escapeHtml(s1)} | Status 2: ${escapeHtml(s2)}</p>
+      ${feeHtml}
+    `;
+    return div;
   }
-});
 
+  function escapeHtml(str) {
+    if (!str && str !== 0) return '';
+    return String(str)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
 
-    // ===== History: only show entries for this user (capturerId === user.userId) =====
-    const latestHistory = document.getElementById("latestHistory");
-    const historyList = document.getElementById("historyList");
-    const toggleHistory = document.getElementById("toggleHistory");
+  const latestHistory = document.getElementById("latestHistory");
+  const historyList = document.getElementById("historyList");
+  const toggleHistory = document.getElementById("toggleHistory");
 
-    function renderHistoryItem(data) {
-      const time = data.timestamp?.toDate?.().toLocaleString() || "";
-      const photoCount = data.photoCount || 0;
-      const s1 = data.status1 || "—";
-      const s2 = data.status2 || "—";
-      const feeHtml = (data.rejectionFee !== undefined && data.rejectionFee !== null && isFinite(data.rejectionFee))
-        ? `<p class="text-xs text-red-600">Rejection Fee: GHS ${Number(data.rejectionFee).toFixed(2)}</p>`
-        : "";
-      const div = document.createElement("div");
-      div.className = "p-3 border-b border-gray-200";
-      div.innerHTML = `
-        <div class="flex justify-between items-center">
-          <h3 class="font-semibold text-gray-900">${escapeHtml(data.name)}</h3>
-          <span class="text-xs text-gray-500">${time}</span>
-        </div>
-        <p class="text-sm text-gray-600">${escapeHtml(data.address)}</p>
-        <p class="text-xs text-gray-500">📞 ${escapeHtml(data.phone || '')}</p>
-        <p class="text-xs text-gray-500">Sent by: ${escapeHtml(data.sender || '—')} | Captured by: ${escapeHtml(data.capturerName || '')} (${escapeHtml(data.role || '')})</p>
-        <p class="text-xs text-gray-500">📷 ${photoCount} photos</p>
-        <p class="text-xs text-gray-500">Status 1: ${escapeHtml(s1)} | Status 2: ${escapeHtml(s2)}</p>
-        ${feeHtml}
-      `;
-      return div;
-    }
-
-    // small helper to avoid injecting raw HTML from data
-    function escapeHtml(str) {
-      if (!str && str !== 0) return '';
-      return String(str)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
-    }
-
-    // Query only parcels created by this logged-in user
-    const parcelsQuery = query(collection(db, "parcels"), where("capturerId", "==", user.userId));
-    onSnapshot(parcelsQuery, (snapshot) => {
-      // convert docs to array with data, then sort descending by timestamp (client-side)
-      const docs = snapshot.docs.map(d => ({ id: d.id, data: d.data() }));
-      docs.sort((a,b) => {
-        const at = a.data.timestamp?.toMillis ? a.data.timestamp.toMillis() : 0;
-        const bt = b.data.timestamp?.toMillis ? b.data.timestamp.toMillis() : 0;
-        return bt - at;
-      });
-
-      latestHistory.innerHTML = "";
-      historyList.innerHTML = "";
-      let first = true;
-      for (const item of docs) {
-        const node = renderHistoryItem(item.data);
-        if (first) { latestHistory.appendChild(node); first = false; }
-        else historyList.appendChild(node);
-      }
+  const parcelsQuery = query(collection(db, "parcels"), where("capturerId", "==", user.userId));
+  onSnapshot(parcelsQuery, (snapshot) => {
+    const docs = snapshot.docs.map(d => ({ id: d.id, data: d.data() }));
+    docs.sort((a, b) => {
+      const at = a.data.timestamp?.toMillis ? a.data.timestamp.toMillis() : 0;
+      const bt = b.data.timestamp?.toMillis ? b.data.timestamp.toMillis() : 0;
+      return bt - at;
     });
 
-    // Toggle show/hide history list (keeps same UI)
-    let showAll = false;
-    toggleHistory.addEventListener("click", () => {
-      showAll = !showAll;
-      if (showAll) {
-        historyList.classList.remove("hidden");
-        toggleHistory.textContent = "Hide";
-      } else {
-        historyList.classList.add("hidden");
-        toggleHistory.textContent = "Show All";
-      }
-    });
-
-// ===== Officer PIN logic =====
-const officerBtn = document.getElementById("officerBtn"); // use the existing button
-const pinModal = document.getElementById("pinModal");
-const officerPinInput = document.getElementById("officerPinInput");
-const submitPinBtn = document.getElementById("submitPinBtn");
-const cancelPinBtn = document.getElementById("cancelPinBtn");
-const pinError = document.getElementById("pinError");
-
-const correctPin = "1234"; // 🔐 Change this to your secret PIN
-
-if (officerBtn) {
-  officerBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    officerPinInput.value = "";
-    pinError.classList.add("hidden");
-    pinModal.classList.remove("hidden");
-    officerPinInput.focus();
-  });
-}
-
-cancelPinBtn.addEventListener("click", () => {
-  pinModal.classList.add("hidden");
-});
-
-submitPinBtn.addEventListener("click", () => {
-  if (officerPinInput.value.trim() === correctPin) {
-    pinModal.classList.add("hidden");
-    window.location.href = "officer.html";
-  } else {
-    pinError.classList.remove("hidden");
-    officerPinInput.value = "";
-    officerPinInput.focus();
-  }
-});
-
-// Allow Enter key
-officerPinInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") submitPinBtn.click();
-});
-
-
-// Auto-hide navbar on scroll (mobile only)
-if (window.innerWidth < 640) { // sm breakpoint
-  let lastScroll = 0;
-  const header = document.querySelector("header");
-
-  window.addEventListener("scroll", () => {
-    const currentScroll = window.scrollY;
-    if (currentScroll > lastScroll && currentScroll > 50) {
-      // scrolling down → hide navbar
-      header.classList.add("-translate-y-full");
-    } else {
-      // scrolling up → show navbar
-      header.classList.remove("-translate-y-full");
+    latestHistory.innerHTML = "";
+    historyList.innerHTML = "";
+    let first = true;
+    for (const item of docs) {
+      const node = renderHistoryItem(item.data);
+      if (first) { latestHistory.appendChild(node); first = false; }
+      else historyList.appendChild(node);
     }
-    lastScroll = currentScroll;
   });
-}
 
-
-// Auto-hide navbar on scroll (only mobile)
-if (window.innerWidth < 640) {  // sm breakpoint in Tailwind = 640px
-  let lastScroll = 0;
-  const header = document.querySelector("header");
-
-  window.addEventListener("scroll", () => {
-    const currentScroll = window.scrollY;
-    if (currentScroll > lastScroll && currentScroll > 50) {
-      // Scrolling down → hide navbar
-      header.classList.add("-translate-y-full");
+  let showAll = false;
+  toggleHistory.addEventListener("click", () => {
+    showAll = !showAll;
+    if (showAll) {
+      historyList.classList.remove("hidden");
+      toggleHistory.textContent = "Hide";
     } else {
-      // Scrolling up → show navbar
-      header.classList.remove("-translate-y-full");
+      historyList.classList.add("hidden");
+      toggleHistory.textContent = "Show All";
     }
-    lastScroll = currentScroll;
   });
-}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-
-  </script>
 </body>
 </html>
