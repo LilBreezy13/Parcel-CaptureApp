@@ -78,10 +78,13 @@
         <video id="camera" class="w-full rounded-lg bg-black h-48 sm:h-64 object-cover" autoplay playsinline muted></video>
         <canvas id="snapshotCanvas" class="hidden"></canvas>
 
-        <div id="scannerOverlay"
-     class="absolute inset-0 flex items-center justify-center pointer-events-none">
-  <div class="border-4 border-green-500 rounded-lg w-3/4 h-2/3"></div>
+  <!-- Scanner overlay -->
+<div id="scannerOverlay"
+     class="absolute inset-0 pointer-events-none flex items-center justify-center">
+  <!-- Green guide box -->
+  <div class="border-4 border-green-500 rounded-lg w-4/5 h-4/5"></div>
 </div>
+
 
 
         <div class="absolute top-2 right-2 flex gap-2">
@@ -215,7 +218,14 @@
   <div id="mobileUserInfo" class="mt-1 block sm:hidden text-gray-800 font-medium"></div>
 </footer>
 
-  <!-- Scripts --><script type="module">
+
+
+
+
+  <!-- Scripts -->
+   
+   
+   <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
     getFirestore, collection, addDoc, serverTimestamp,
@@ -236,7 +246,8 @@
   };
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const storage = getStorage(app, "gs://employee-app-c781d.firebasestorage.app");
+ const storage = getStorage(app);
+
 
 
   // ===== Load logged-in user from sessionStorage =====
@@ -342,71 +353,93 @@
     return { blob, url };
   }
 
+// ===== Helper: preprocess image for OCR (improves text detection) =====
+async function preprocessForOCR(blob) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // Convert to black & white (thresholding)
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+        const bw = avg > 140 ? 255 : 0;
+        data[i] = data[i+1] = data[i+2] = bw;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      canvas.toBlob(resolve, "image/png");
+    };
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+
   captureBtn.addEventListener('click', async () => {
-    const shots = Number(document.getElementById('shotCount').value || 1);
-    const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
+  const shots = Number(document.getElementById('shotCount').value || 1);
+  const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
 
-    if (status1 === 'Rejected' && shots > 1) {
-      alert("Rejected parcels can only be captured one at a time.");
-      return;
-    }
+  if (status1 === 'Rejected' && shots > 1) {
+    alert("Rejected parcels can only be captured one at a time.");
+    return;
+  }
 
-    capturedBlobs = [];
-    thumbs.innerHTML = "";
+  capturedBlobs = [];
+  thumbs.innerHTML = "";
 
   for (let i = 0; i < shots; i++) {
-  const { blob, url } = await captureFrame(videoEl);
-  capturedBlobs.push({ blob, url });
-  addThumbFromUrl(url);
+    const { blob, url } = await captureFrame(videoEl);
+    capturedBlobs.push({ blob, url });
+    addThumbFromUrl(url);
 
-  // Flash scanner overlay green
-  const overlay = document.querySelector('#scannerOverlay div');
-  overlay.classList.add('bg-green-200/30');
-  setTimeout(() => overlay.classList.remove('bg-green-200/30'), 200);
+    // Flash scanner overlay green
+    const overlay = document.querySelector('#scannerOverlay div');
+    overlay.classList.add('bg-green-200/30');
+    setTimeout(() => overlay.classList.remove('bg-green-200/30'), 200);
 
-  // OCR only on the first shot
-  if (i === 0) {
-    Tesseract.recognize(blob, 'eng', { logger: m => console.log(m) })
-      .then(({ data: { text } }) => {
+    // Run OCR only on the first shot
+    if (i === 0) {
+      try {
+        const cleanBlob = await preprocessForOCR(blob);
+        const { data: { text } } = await Tesseract.recognize(cleanBlob, 'eng', {
+          logger: m => console.log(m) // progress in console
+        });
+
         console.log("OCR result:", text);
 
-        // Try to auto-fill fields
-        const nameMatch = text.match(/Name[:\s]*(.+)/i);
-        const addrMatch = text.match(/Address[:\s]*(.+)/i);
-        const phoneMatch = text.match(/(\+?\d[\d\s-]{7,})/);
+        // Parse Ghana-style stickers
+        const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+        let nameGuess = lines[0] || "";
+        let phoneMatch = text.match(/(0\d{9}|\+233\s?\d{9})/);
+        let addrGuess = lines.find(l =>
+          l.match(/(P\.?O\.?\s?Box|Street|Rd|Accra|Kumasi)/i)
+        );
 
-        if (nameMatch) document.getElementById('parcelName').value = nameMatch[1].trim();
-        if (addrMatch) document.getElementById('parcelAddress').value = addrMatch[1].trim();
-        if (phoneMatch) document.getElementById('parcelPhone').value = phoneMatch[1].trim();
-      })
-      .catch(err => console.error("OCR failed", err));
+        if (nameGuess) document.getElementById('parcelName').value = nameGuess;
+        if (addrGuess) document.getElementById('parcelAddress').value = addrGuess;
+        if (phoneMatch) document.getElementById('parcelPhone').value = phoneMatch[0];
+
+        console.log("Autofill:", {
+          name: nameGuess,
+          address: addrGuess,
+          phone: phoneMatch?.[0]
+        });
+      } catch (err) {
+        console.error("OCR failed:", err);
+      }
+    }
   }
-}
+});
 
 
-    // Run OCR on the first captured image only (to avoid slowdowns with multi-shot)
-if (i === 0) {
-  Tesseract.recognize(blob, 'eng', { logger: m => console.log(m) })
-    .then(({ data: { text } }) => {
-      console.log("OCR result:", text);
 
-      // Simple extraction (you can tune this regex later)
-      const nameMatch = text.match(/Name[:\s]*(.+)/i);
-      const addrMatch = text.match(/Address[:\s]*(.+)/i);
-      const phoneMatch = text.match(/(\+?\d[\d\s-]{7,})/);
-
-      if (nameMatch) document.getElementById('parcelName').value = nameMatch[1].trim();
-      if (addrMatch) document.getElementById('parcelAddress').value = addrMatch[1].trim();
-      if (phoneMatch) document.getElementById('parcelPhone').value = phoneMatch[1].trim();
-    })
-    .catch(err => console.error("OCR failed", err));
-}
-
-    const overlay = document.querySelector('#scannerOverlay div');
-overlay.classList.add('bg-green-200/30');
-setTimeout(() => overlay.classList.remove('bg-green-200/30'), 200);
-
-  });
 
   // ===== File Picker (with compression) =====
   filePicker.addEventListener('change', async e => {
