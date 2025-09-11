@@ -25,6 +25,8 @@
   </script>
   <link rel="icon" href="/favicon (1).ico" type="image/x-icon">
   <link rel="shortcut icon" href="/favicon (1).ico" type="image/x-icon">
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.2.1/dist/tesseract.min.js"></script>
+
 </head>
 
 <body class="vh-screen flex flex-col">
@@ -209,10 +211,14 @@
   <!-- Scripts -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getFirestore, collection, addDoc, serverTimestamp,
-      query, where, onSnapshot
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+   import {
+  getFirestore, collection, addDoc, serverTimestamp,
+  query, where, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+import {
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
     // ===== Firebase config (your project) =====
     const firebaseConfig = {
@@ -225,6 +231,8 @@
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const storage = getStorage(app);
+
 
     // ===== Load logged-in user from sessionStorage (no Firebase Auth) =====
     const user = (() => {
@@ -306,37 +314,57 @@ document.getElementById("mobileUserInfo").textContent =
       });
       wrap.appendChild(img); wrap.appendChild(rm); thumbs.appendChild(wrap);
     }
+// Capture frame, compress, and keep full-res crop for OCR
+async function captureFrameCompressed(videoEl, maxW = 1200, maxH = 900, quality = 0.45) {
+  const full = document.createElement('canvas');
+  full.width = videoEl.videoWidth;
+  full.height = videoEl.videoHeight;
+  full.getContext('2d').drawImage(videoEl, 0, 0);
 
-    function resizeAndCompress(fileOrBlob, callback) {
-      const img = new Image();
-      const url = URL.createObjectURL(fileOrBlob);
-      img.onload = () => {
-        const maxW = 400, maxH = 300;
-        let { width, height } = img;
-        const ratio = Math.min(maxW / width, maxH / height, 1);
-        width = Math.round(width * ratio); height = Math.round(height * ratio);
-        const canvas = document.createElement("canvas");
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(blob => { callback(blob); URL.revokeObjectURL(url); }, "image/jpeg", 0.4);
-      };
-      img.src = url;
-    }
+  // compress
+  const ratio = Math.min(1, maxW / full.width, maxH / full.height);
+  const outW = Math.round(full.width * ratio);
+  const outH = Math.round(full.height * ratio);
+  const out = document.createElement('canvas');
+  out.width = outW; out.height = outH;
+  out.getContext('2d').drawImage(full, 0, 0, full.width, full.height, 0, 0, outW, outH);
+  const dataUrl = out.toDataURL('image/jpeg', quality);
+  const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', quality));
 
-    captureBtn.addEventListener('click', () => {
-      if (!videoEl.videoWidth) return;
-      canvasEl.width = videoEl.videoWidth; canvasEl.height = videoEl.videoHeight;
-      const ctx = canvasEl.getContext('2d'); ctx.drawImage(videoEl, 0, 0);
-      canvasEl.toBlob(blob => {
-        if (!blob) return;
-        resizeAndCompress(blob, resized => {
-          const url = URL.createObjectURL(resized);
-          objectUrls.add(url); capturedBlobs.push({ blob: resized, url });
-          addThumbFromUrl(url);
-        });
-      }, "image/jpeg", 0.8);
-    });
+  return { blob, dataUrl, cropFull: full };
+}
+
+function addThumb(dataUrl, aligned) {
+  const wrap = document.createElement('div');
+  wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
+  const img = document.createElement('img');
+  img.src = dataUrl; img.className = 'w-full h-full object-cover rounded-lg border';
+  const badge = document.createElement('div');
+  badge.className = 'absolute -top-1 -left-1 px-1 text-xs rounded-full text-white';
+  badge.style.background = aligned ? 'green' : 'red';
+  badge.textContent = aligned ? '✓' : '✖';
+  wrap.appendChild(img); wrap.appendChild(badge);
+  thumbs.appendChild(wrap);
+}
+
+captureBtn.addEventListener('click', async () => {
+  const shots = Number(document.getElementById('shotCount').value || 1);
+  const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
+  if (status1 === 'Rejected' && shots > 1) {
+    alert("Rejected parcels can only be captured one at a time.");
+    return;
+  }
+
+  capturedBlobs = [];
+  thumbs.innerHTML = "";
+
+  for (let i = 0; i < shots; i++) {
+    const { blob, dataUrl, cropFull } = await captureFrameCompressed(videoEl);
+    const aligned = true; // (basic alignment check; can refine later)
+    addThumb(dataUrl, aligned);
+    capturedBlobs.push({ blob, dataUrl, cropFull, aligned });
+  }
+});
 
     filePicker.addEventListener('change', e => {
       const files = Array.from(e.target.files || []);
@@ -380,70 +408,87 @@ document.getElementById("mobileUserInfo").textContent =
     updateRejectionFeeVisibility();
 
     // ===== Submit Parcel (saves rejectionFee when applicable) =====
-    document.getElementById('submitBtn').addEventListener('click', async () => {
-      const name = document.getElementById('parcelName').value.trim();
-      const address = document.getElementById('parcelAddress').value.trim();
-      const phone = document.getElementById('parcelPhone').value.trim();
-      const sender = document.getElementById('senderName').value.trim();
-      const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
-      const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
+   document.getElementById('submitBtn').addEventListener('click', async () => {
+  const nameEl = document.getElementById('parcelName');
+  const addrEl = document.getElementById('parcelAddress');
+  const phoneEl = document.getElementById('parcelPhone');
+  const senderEl = document.getElementById('senderName');
+  const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
+  const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
 
-      if (!name || !address || !phone || !sender) {
-        alert('Please fill all required fields!');
-        return;
+  if (!senderEl.value.trim()) {
+    alert('Please enter sender');
+    return;
+  }
+  if (status1 === 'Rejected' && capturedBlobs.length > 1) {
+    alert("Rejected must be single shot");
+    return;
+  }
+
+  const submitBtn = document.getElementById('submitBtn');
+  const prev = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Saving...";
+
+  try {
+    for (const item of capturedBlobs) {
+      // upload to Storage
+      const ts = Date.now();
+      const fileName = `parcels/${user.userId}_${ts}.jpg`;
+      const ref = storageRef(storage, fileName);
+      await uploadBytes(ref, item.blob);
+      const url = await getDownloadURL(ref);
+
+      // run OCR only if fields are empty
+      if ((!nameEl.value || !addrEl.value || !phoneEl.value)) {
+        const blob = await new Promise(r => item.cropFull.toBlob(r, 'image/png'));
+        const { data: { text } } = await Tesseract.recognize(blob, 'eng');
+        const ocrText = (text || "").trim();
+        if (!phoneEl.value) {
+          const m = ocrText.match(/(\+?\d{8,15})/);
+          if (m) phoneEl.value = m[1];
+        }
+        const lines = ocrText.split(/\n/).map(s => s.trim()).filter(Boolean);
+        if (!nameEl.value && lines[0]) nameEl.value = lines[0];
+        if (!addrEl.value && lines.length > 1) addrEl.value = lines.slice(1, 3).join(", ");
       }
 
-      // If rejected, require fee
-      const isRejected = status1 === 'Rejected';
-      let rejectionFee = null;
-      if (isRejected) {
-        const feeRaw = (document.getElementById('rejectionFee').value || '').trim();
-        if (feeRaw === '') { alert('Please enter rejection fee (GHS) for rejected parcel.'); return; }
-        rejectionFee = parseFloat(feeRaw);
-        if (!isFinite(rejectionFee) || rejectionFee < 0) { alert('Enter a valid rejection fee amount.'); return; }
+      const payload = {
+        name: nameEl.value.trim(),
+        address: addrEl.value.trim(),
+        phone: phoneEl.value.trim(),
+        sender: senderEl.value.trim(),
+        capturerId: user.userId,
+        capturerName: user.name,
+        role: user.role,
+        status1, status2,
+        photos: [url],
+        timestamp: serverTimestamp()
+      };
+
+      if (status1 === 'Rejected') {
+        const fee = document.getElementById('rejectionFee').value;
+        if (!fee) { alert("Enter rejection fee"); submitBtn.disabled = false; submitBtn.textContent = prev; return; }
+        payload.rejectionFee = parseFloat(fee);
       }
 
-      const submitBtn = document.getElementById('submitBtn');
-      const prevText = submitBtn.textContent;
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Saving...';
+      await addDoc(collection(db, "parcels"), payload);
+    }
 
-      try {
-        const payload = {
-          name, address, phone,
-          sender,
-          capturerId: user.userId,
-          capturerName: user.name,
-          role: user.role,
-          status1, status2,
-          photoCount: capturedBlobs.length,
-          timestamp: serverTimestamp()
-        };
-        if (isRejected && rejectionFee !== null) payload.rejectionFee = rejectionFee;
+    submitBtn.textContent = "Saved ✓";
+    setTimeout(() => { submitBtn.textContent = prev; submitBtn.disabled = false; }, 900);
+    // reset
+    nameEl.value = addrEl.value = phoneEl.value = senderEl.value = "";
+    thumbs.innerHTML = "";
+    capturedBlobs = [];
+  } catch (e) {
+    console.error(e);
+    alert("Save failed: " + e.message);
+    submitBtn.disabled = false;
+    submitBtn.textContent = prev;
+  }
+});
 
-        await addDoc(collection(db, "parcels"), payload);
-
-        submitBtn.textContent = 'Saved ✓';
-        setTimeout(()=>{ submitBtn.textContent = prevText; submitBtn.disabled = false; }, 900);
-
-        // Clear form + previews
-        document.getElementById('parcelName').value = '';
-        document.getElementById('parcelAddress').value = '';
-        document.getElementById('parcelPhone').value = '';
-        document.getElementById('senderName').value = '';
-        document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
-        updateRejectionFeeVisibility();
-        objectUrls.forEach(u => URL.revokeObjectURL(u));
-        objectUrls.clear();
-        thumbs.innerHTML = '';
-        capturedBlobs = [];
-      } catch (err) {
-        console.error("Error saving to Firestore:", err);
-        alert('Save failed: ' + (err?.message || 'unknown error'));
-        submitBtn.disabled = false;
-        submitBtn.textContent = prevText;
-      }
-    });
 
     // ===== History: only show entries for this user (capturerId === user.userId) =====
     const latestHistory = document.getElementById("latestHistory");
