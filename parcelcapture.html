@@ -78,12 +78,6 @@
         <video id="camera" class="w-full rounded-lg bg-black h-48 sm:h-64 object-cover" autoplay playsinline muted></video>
         <canvas id="snapshotCanvas" class="hidden"></canvas>
 
-  <!-- Scanner overlay -->
-<div id="scannerOverlay"
-     class="absolute inset-0 pointer-events-none flex items-center justify-center">
-  <!-- Green guide box -->
-  <div class="border-4 border-green-500 rounded-lg w-4/5 h-4/5"></div>
-</div>
 
 
 
@@ -183,6 +177,7 @@
       </div>
     </section>
 
+
     <!-- History Section -->
     <div class="mt-6">
       <div class="flex justify-between items-center mb-2">
@@ -223,174 +218,138 @@
 
 
   <!-- Scripts -->
-   
-   
    <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import {
-    getFirestore, collection, addDoc, serverTimestamp,
-    query, where, onSnapshot
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import {
-    getStorage, ref as storageRef, uploadBytes, getDownloadURL
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-  // ===== Firebase config (your project) =====
-  const firebaseConfig = {
-    apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
-    authDomain: "employee-app-c781d.firebaseapp.com",
-    projectId: "employee-app-c781d",
-    storageBucket: "employee-app-c781d.appspot.com",
-    messagingSenderId: "232631444018",
-    appId: "1:232631444018:web:37b70fe37975abcc1b922b"
-  };
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
- const storage = getStorage(app);
+// ===== Firebase config =====
+const firebaseConfig = {
+  apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
+  authDomain: "employee-app-c781d.firebaseapp.com",
+  projectId: "employee-app-c781d",
+  storageBucket: "employee-app-c781d.appspot.com",   // must be appspot.com
+  messagingSenderId: "232631444018",
+  appId: "1:232631444018:web:37b70fe37975abcc1b922b"
+};
 
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-
-  // ===== Load logged-in user from sessionStorage =====
-  const user = (() => {
-    try { return JSON.parse(sessionStorage.getItem("user")); } catch { return null; }
-  })();
-  if (!user || !user.userId) {
-    window.location.href = "index.html";
-  } else {
-    document.getElementById("userInfo").textContent = `${user.name} (${user.userId}) - ${user.role}`;
-    document.getElementById("capturerName").value = `${user.name} (${user.userId})`;
-    document.getElementById("mobileUserInfo").textContent =
-      `Parcel Capture ${user.name} (${user.userId}) - ${user.role}`;
-  }
-
-  // ===== Sign out =====
-  document.getElementById("signOutBtn").addEventListener("click", () => {
-    sessionStorage.removeItem("user");
-    window.location.href = "index.html";
-  });
-
-  // ===== Camera setup =====
-  const videoEl = document.getElementById('camera');
-  const canvasEl = document.getElementById('snapshotCanvas');
-  const thumbs = document.getElementById('thumbs');
-  const captureBtn = document.getElementById('captureBtn');
-  const filePicker = document.getElementById('filePicker');
-  const switchCamBtn = document.getElementById('switchCam');
-
-  let currentStream = null;
-  let useBackCamera = true;
-  let capturedBlobs = [];
-  const objectUrls = new Set();
-
-  async function startCamera() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      document.getElementById('cameraHint').textContent = 'Camera not available. Use 📁 to select a photo.';
-      return;
-    }
-    if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-    try {
-      currentStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
-        audio: false
-      });
-    } catch {
-      try {
-        currentStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: useBackCamera ? 'environment' : 'user' },
-          audio: false
-        });
-      } catch (err) {
-        console.warn('Camera failed, use file picker instead', err);
-        document.getElementById('cameraHint').textContent = 'Could not access camera. Use 📁 instead.';
-        return;
-      }
-    }
-    videoEl.srcObject = currentStream;
-  }
-
-  function addThumbFromUrl(url) {
-    const wrap = document.createElement('div');
-    wrap.className = 'relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0';
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = 'shot';
-    img.className = 'w-full h-full object-cover rounded-lg border';
-    const rm = document.createElement('button');
-    rm.type = 'button';
-    rm.className = 'absolute -top-1 -right-1 text-xs bg-black/70 text-white rounded-full px-1';
-    rm.textContent = '✖';
-    rm.addEventListener('click', () => {
-      wrap.remove();
-      if (objectUrls.has(img.src)) {
-        URL.revokeObjectURL(img.src);
-        objectUrls.delete(img.src);
-      }
-      capturedBlobs = capturedBlobs.filter(b => b.url !== url);
-    });
-    wrap.appendChild(img);
-    wrap.appendChild(rm);
-    thumbs.appendChild(wrap);
-  }
-
-  // ===== Capture (multi-shot) =====
-  async function captureFrame(videoEl, maxW = 800, maxH = 600, quality = 0.5) {
-    const canvas = document.createElement('canvas');
-    canvas.width = videoEl.videoWidth;
-    canvas.height = videoEl.videoHeight;
-    canvas.getContext('2d').drawImage(videoEl, 0, 0);
-
-    const ratio = Math.min(1, maxW / canvas.width, maxH / canvas.height);
-    const outW = Math.round(canvas.width * ratio);
-    const outH = Math.round(canvas.height * ratio);
-
-    const out = document.createElement('canvas');
-    out.width = outW;
-    out.height = outH;
-    out.getContext('2d').drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, outW, outH);
-
-    const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', quality));
-    const url = URL.createObjectURL(blob);
-    return { blob, url };
-  }
-
-// ===== Helper: preprocess image for OCR (improves text detection) =====
-async function preprocessForOCR(blob) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
-
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      // Convert to black & white (thresholding)
-      for (let i = 0; i < data.length; i += 4) {
-        const avg = (data[i] + data[i+1] + data[i+2]) / 3;
-        const bw = avg > 140 ? 255 : 0;
-        data[i] = data[i+1] = data[i+2] = bw;
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      canvas.toBlob(resolve, "image/png");
-    };
-    img.src = URL.createObjectURL(blob);
-  });
+// ===== Load logged-in user =====
+const user = (() => {
+  try { return JSON.parse(sessionStorage.getItem("user")); } catch { return null; }
+})();
+if (!user || !user.userId) {
+  window.location.href = "index.html";
+} else {
+  document.getElementById("userInfo").textContent = `${user.name} (${user.userId}) - ${user.role}`;
+  document.getElementById("capturerName").value = `${user.name} (${user.userId})`;
+  document.getElementById("mobileUserInfo").textContent =
+    `Parcel Capture ${user.name} (${user.userId}) - ${user.role}`;
 }
 
+// ===== Sign out =====
+document.getElementById("signOutBtn").addEventListener("click", () => {
+  sessionStorage.removeItem("user");
+  window.location.href = "index.html";
+});
 
-  captureBtn.addEventListener('click', async () => {
-  const shots = Number(document.getElementById('shotCount').value || 1);
-  const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
+// ===== Camera setup =====
+const videoEl = document.getElementById('camera');
+const thumbs = document.getElementById('thumbs');
+const captureBtn = document.getElementById('captureBtn');
+const filePicker = document.getElementById('filePicker');
+const switchCamBtn = document.getElementById('switchCam');
 
-  if (status1 === 'Rejected' && shots > 1) {
-    alert("Rejected parcels can only be captured one at a time.");
+let currentStream = null;
+let useBackCamera = true;
+let capturedBlobs = [];
+
+async function startCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    document.getElementById('cameraHint').textContent = 'Camera not available. Use 📁 to select a photo.';
     return;
   }
+  if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+  try {
+    currentStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: useBackCamera ? { exact: 'environment' } : 'user' },
+      audio: false
+    });
+  } catch {
+    try {
+      currentStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: useBackCamera ? 'environment' : 'user' },
+        audio: false
+      });
+    } catch (err) {
+      console.warn('Camera failed, use file picker instead', err);
+      document.getElementById('cameraHint').textContent = 'Could not access camera. Use 📁 instead.';
+      return;
+    }
+  }
+  videoEl.srcObject = currentStream;
+}
 
+// ===== Capture frame =====
+async function captureFrame(videoEl, maxW = 800, maxH = 600, quality = 0.7) {
+  const canvas = document.createElement('canvas');
+  canvas.width = videoEl.videoWidth;
+  canvas.height = videoEl.videoHeight;
+  canvas.getContext('2d').drawImage(videoEl, 0, 0);
+
+  const ratio = Math.min(1, maxW / canvas.width, maxH / canvas.height);
+  const outW = Math.round(canvas.width * ratio);
+  const outH = Math.round(canvas.height * ratio);
+
+  const out = document.createElement('canvas');
+  out.width = outW;
+  out.height = outH;
+  out.getContext('2d').drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, outW, outH);
+
+  const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', quality));
+  const url = URL.createObjectURL(blob);
+  return { blob, url };
+}
+
+// ===== Thumbnails (max 3) =====
+function addThumbFromUrl(url) {
+  if (capturedBlobs.length > 3) {
+    alert("You cannot capture more than 3 photos.");
+    return;
+  }
+  const wrap = document.createElement('div');
+  wrap.className = 'relative w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0';
+  const img = document.createElement('img');
+  img.src = url;
+  img.alt = 'shot';
+  img.className = 'w-full h-full object-cover rounded-xl shadow border';
+  const rm = document.createElement('button');
+  rm.type = 'button';
+  rm.className = 'absolute -top-1 -right-1 text-xs bg-red-600 text-white rounded-full px-1 shadow';
+  rm.textContent = '✖';
+  rm.addEventListener('click', () => {
+    wrap.remove();
+    capturedBlobs = capturedBlobs.filter(b => b.url !== url);
+  });
+  wrap.appendChild(img);
+  wrap.appendChild(rm);
+  thumbs.appendChild(wrap);
+}
+
+// ===== Capture button =====
+captureBtn.addEventListener('click', async () => {
+  const shots = Number(document.getElementById('shotCount').value || 1);
+  if (shots > 3) {
+    alert("You cannot capture more than 3 shots.");
+    return;
+  }
   capturedBlobs = [];
   thumbs.innerHTML = "";
 
@@ -398,239 +357,104 @@ async function preprocessForOCR(blob) {
     const { blob, url } = await captureFrame(videoEl);
     capturedBlobs.push({ blob, url });
     addThumbFromUrl(url);
-
-    // Flash scanner overlay green
-    const overlay = document.querySelector('#scannerOverlay div');
-    overlay.classList.add('bg-green-200/30');
-    setTimeout(() => overlay.classList.remove('bg-green-200/30'), 200);
-
-    // Run OCR only on the first shot
-    if (i === 0) {
-      try {
-        const cleanBlob = await preprocessForOCR(blob);
-        const { data: { text } } = await Tesseract.recognize(cleanBlob, 'eng', {
-          logger: m => console.log(m) // progress in console
-        });
-
-        console.log("OCR result:", text);
-
-        // Parse Ghana-style stickers
-        const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-        let nameGuess = lines[0] || "";
-        let phoneMatch = text.match(/(0\d{9}|\+233\s?\d{9})/);
-        let addrGuess = lines.find(l =>
-          l.match(/(P\.?O\.?\s?Box|Street|Rd|Accra|Kumasi)/i)
-        );
-
-        if (nameGuess) document.getElementById('parcelName').value = nameGuess;
-        if (addrGuess) document.getElementById('parcelAddress').value = addrGuess;
-        if (phoneMatch) document.getElementById('parcelPhone').value = phoneMatch[0];
-
-        console.log("Autofill:", {
-          name: nameGuess,
-          address: addrGuess,
-          phone: phoneMatch?.[0]
-        });
-      } catch (err) {
-        console.error("OCR failed:", err);
-      }
-    }
   }
 });
 
+// ===== File Picker =====
+filePicker.addEventListener('change', async e => {
+  const files = Array.from(e.target.files || []);
+  for (const f of files) {
+    if (!f.type.startsWith("image/")) continue;
+    const img = await createImageBitmap(f);
+    const canvas = document.createElement("canvas");
+    const maxW = 800, maxH = 600;
+    let { width, height } = img;
+    const ratio = Math.min(maxW / width, maxH / height, 1);
+    width = Math.round(width * ratio);
+    height = Math.round(height * ratio);
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.7));
+    const url = URL.createObjectURL(blob);
+    capturedBlobs.push({ blob, url });
+    addThumbFromUrl(url);
+  }
+  e.target.value = "";
+});
 
+// ===== Switch camera =====
+switchCamBtn.addEventListener('click', async () => {
+  useBackCamera = !useBackCamera;
+  await startCamera();
+});
+startCamera();
 
+// ===== Submit handler =====
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const name = document.getElementById('parcelName').value.trim();
+  const address = document.getElementById('parcelAddress').value.trim();
+  const phone = document.getElementById('parcelPhone').value.trim();
+  const sender = document.getElementById('senderName').value.trim();
 
-  // ===== File Picker (with compression) =====
-  filePicker.addEventListener('change', async e => {
-    const files = Array.from(e.target.files || []);
-    for (const f of files) {
-      if (!f.type.startsWith("image/")) continue;
-      const img = await createImageBitmap(f);
-      const canvas = document.createElement("canvas");
-      const maxW = 800, maxH = 600;
-      let { width, height } = img;
-      const ratio = Math.min(maxW / width, maxH / height, 1);
-      width = Math.round(width * ratio);
-      height = Math.round(height * ratio);
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.5));
-      const url = URL.createObjectURL(blob);
-      capturedBlobs.push({ blob, url });
-      addThumbFromUrl(url);
+  if (!name || !address || !phone || !sender) {
+    alert("Please fill all required fields!");
+    return;
+  }
+
+  const submitBtn = document.getElementById("submitBtn");
+  const prevText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Saving...";
+
+  try {
+    const uploadedUrls = [];
+    for (let i = 0; i < capturedBlobs.length; i++) {
+      const item = capturedBlobs[i];
+      const ts = Date.now();
+      const fileName = `parcels/${user.userId}_${ts}_${i}.jpg`;
+      const ref = storageRef(storage, fileName);
+      await uploadBytes(ref, item.blob);
+      const url = await getDownloadURL(ref);
+      uploadedUrls.push(url);
     }
-    e.target.value = "";
-  });
 
-  switchCamBtn.addEventListener('click', async () => {
-    useBackCamera = !useBackCamera;
-    await startCamera();
-  });
-  startCamera();
+    const payload = {
+      name, address, phone, sender,
+      capturerId: user.userId,
+      capturerName: user.name,
+      role: user.role,
+      photoCount: uploadedUrls.length,
+      photos: uploadedUrls,
+      timestamp: serverTimestamp()
+    };
 
-  // ===== Submit handler =====
-  document.getElementById('submitBtn').addEventListener('click', async () => {
-    const name = document.getElementById('parcelName').value.trim();
-    const address = document.getElementById('parcelAddress').value.trim();
-    const phone = document.getElementById('parcelPhone').value.trim();
-    const sender = document.getElementById('senderName').value.trim();
-    const status1 = document.querySelector('input.status1-checkbox:checked')?.value || '';
-    const status2 = document.querySelector('input.status2-checkbox:checked')?.value || '';
+    await addDoc(collection(db, "parcels"), payload);
 
-    if (!name || !address || !phone || !sender) {
-      alert("Please fill all required fields!");
-      return;
-    }
-
-    if (status1 === "Rejected" && capturedBlobs.length > 1) {
-      alert("Rejected parcels can only be captured one at a time.");
-      return;
-    }
-
-    const submitBtn = document.getElementById("submitBtn");
-    const prevText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Saving...";
-
-    try {
-      const uploadedUrls = [];
-      console.log("Uploading", capturedBlobs.length, "images");
-
-      for (let i = 0; i < capturedBlobs.length; i++) {
-        const item = capturedBlobs[i];
-        const ts = Date.now();
-        const fileName = `parcels/${user.userId}_${ts}_${i}.jpg`;
-        const ref = storageRef(storage, fileName);
-        console.log("Uploading", fileName);
-        await uploadBytes(ref, item.blob);
-        const url = await getDownloadURL(ref);
-        uploadedUrls.push(url);
-        console.log("Got URL:", url);
-      }
-
-      const payload = {
-        name, address, phone, sender,
-        capturerId: user.userId,
-        capturerName: user.name,
-        role: user.role,
-        status1, status2,
-        photoCount: uploadedUrls.length,
-        photos: uploadedUrls,
-        timestamp: serverTimestamp()
-      };
-
-      if (status1 === "Rejected") {
-        const feeRaw = document.getElementById("rejectionFee").value;
-        if (!feeRaw) {
-          alert("Please enter rejection fee");
-          submitBtn.disabled = false;
-          submitBtn.textContent = prevText;
-          return;
-        }
-        payload.rejectionFee = parseFloat(feeRaw);
-      }
-
-      await addDoc(collection(db, "parcels"), payload);
-      console.log("Saved Firestore doc");
-
-      submitBtn.textContent = "Saved ✓";
-      setTimeout(() => {
-        submitBtn.textContent = prevText;
-        submitBtn.disabled = false;
-      }, 800);
-
-      // reset form
-      document.getElementById('parcelName').value = '';
-      document.getElementById('parcelAddress').value = '';
-      document.getElementById('parcelPhone').value = '';
-      document.getElementById('senderName').value = '';
-      document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
-      document.getElementById('rejectionFee').value = '';
-      thumbs.innerHTML = '';
-      capturedBlobs = [];
-
-    } catch (err) {
-      console.error("Save failed:", err);
-      alert("Save failed: " + err.message);
-      submitBtn.disabled = false;
+    submitBtn.textContent = "Saved ✓";
+    setTimeout(() => {
       submitBtn.textContent = prevText;
-    }
-  });
+      submitBtn.disabled = false;
+    }, 800);
 
-  // ===== History (same as before) =====
-  function renderHistoryItem(data) {
-    const time = data.timestamp?.toDate?.().toLocaleString() || "";
-    const photoCount = data.photoCount || 0;
-    const s1 = data.status1 || "—";
-    const s2 = data.status2 || "—";
-    const feeHtml = (data.rejectionFee !== undefined && data.rejectionFee !== null && isFinite(data.rejectionFee))
-      ? `<p class="text-xs text-red-600">Rejection Fee: GHS ${Number(data.rejectionFee).toFixed(2)}</p>`
-      : "";
-    const div = document.createElement("div");
-    div.className = "p-3 border-b border-gray-200";
-    div.innerHTML = `
-      <div class="flex justify-between items-center">
-        <h3 class="font-semibold text-gray-900">${escapeHtml(data.name)}</h3>
-        <span class="text-xs text-gray-500">${time}</span>
-      </div>
-      <p class="text-sm text-gray-600">${escapeHtml(data.address)}</p>
-      <p class="text-xs text-gray-500">📞 ${escapeHtml(data.phone || '')}</p>
-      <p class="text-xs text-gray-500">Sent by: ${escapeHtml(data.sender || '—')} | Captured by: ${escapeHtml(data.capturerName || '')} (${escapeHtml(data.role || '')})</p>
-      <p class="text-xs text-gray-500">📷 ${photoCount} photos</p>
-      <p class="text-xs text-gray-500">Status 1: ${escapeHtml(s1)} | Status 2: ${escapeHtml(s2)}</p>
-      ${feeHtml}
-    `;
-    return div;
+    // reset form
+    document.getElementById('parcelName').value = '';
+    document.getElementById('parcelAddress').value = '';
+    document.getElementById('parcelPhone').value = '';
+    document.getElementById('senderName').value = '';
+    thumbs.innerHTML = '';
+    capturedBlobs = [];
+  } catch (err) {
+    console.error("Save failed", err);
+    alert("Failed to save. Try again.");
+    submitBtn.disabled = false;
+    submitBtn.textContent = prevText;
   }
-
-  function escapeHtml(str) {
-    if (!str && str !== 0) return '';
-    return String(str)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;');
-  }
-
-  const latestHistory = document.getElementById("latestHistory");
-  const historyList = document.getElementById("historyList");
-  const toggleHistory = document.getElementById("toggleHistory");
-
-  const parcelsQuery = query(collection(db, "parcels"), where("capturerId", "==", user.userId));
-  onSnapshot(parcelsQuery, (snapshot) => {
-    const docs = snapshot.docs.map(d => ({ id: d.id, data: d.data() }));
-    docs.sort((a, b) => {
-      const at = a.data.timestamp?.toMillis ? a.data.timestamp.toMillis() : 0;
-      const bt = b.data.timestamp?.toMillis ? b.data.timestamp.toMillis() : 0;
-      return bt - at;
-    });
-
-    latestHistory.innerHTML = "";
-    historyList.innerHTML = "";
-    let first = true;
-    for (const item of docs) {
-      const node = renderHistoryItem(item.data);
-      if (first) { latestHistory.appendChild(node); first = false; }
-      else historyList.appendChild(node);
-    }
-  });
-
-  let showAll = false;
-  toggleHistory.addEventListener("click", () => {
-    showAll = !showAll;
-    if (showAll) {
-      historyList.classList.remove("hidden");
-      toggleHistory.textContent = "Hide";
-    } else {
-      historyList.classList.add("hidden");
-      toggleHistory.textContent = "Show All";
-    }
-  });
+});
 </script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+
+<!-- <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script> -->
 
 </body>
 </html>
