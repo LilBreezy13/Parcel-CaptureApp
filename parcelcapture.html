@@ -218,11 +218,15 @@
 
 
   <!-- Scripts -->
+   
+   
    <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
 import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
@@ -232,7 +236,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyB_gTuAS9i-jywpFYLmMEunh2KJmsCW1_o",
   authDomain: "employee-app-c781d.firebaseapp.com",
   projectId: "employee-app-c781d",
-  storageBucket: "employee-app-c781d.appspot.com",   // must be appspot.com
+  storageBucket: "employee-app-c781d.firebasestorage.app",
   messagingSenderId: "232631444018",
   appId: "1:232631444018:web:37b70fe37975abcc1b922b"
 };
@@ -390,15 +394,50 @@ switchCamBtn.addEventListener('click', async () => {
 });
 startCamera();
 
+// ===== Checkbox logic =====
+function enforceSingleSelect(groupSelector) {
+  document.querySelectorAll(groupSelector).forEach(cb => {
+    cb.addEventListener('change', e => {
+      if (e.target.checked) {
+        document.querySelectorAll(groupSelector).forEach(other => {
+          if (other !== e.target) other.checked = false;
+        });
+      }
+    });
+  });
+}
+enforceSingleSelect('.status1-checkbox');
+enforceSingleSelect('.status2-checkbox');
+
+// ===== Rejection fee toggle =====
+document.querySelectorAll('.status1-checkbox').forEach(cb => {
+  cb.addEventListener('change', () => {
+    const wrap = document.getElementById('rejectionFeeWrap');
+    if (cb.checked && cb.value === "Rejected") {
+      wrap.classList.remove("hidden");
+    } else {
+      wrap.classList.add("hidden");
+      document.getElementById("rejectionFee").value = "";
+    }
+  });
+});
+
 // ===== Submit handler =====
 document.getElementById('submitBtn').addEventListener('click', async () => {
   const name = document.getElementById('parcelName').value.trim();
   const address = document.getElementById('parcelAddress').value.trim();
   const phone = document.getElementById('parcelPhone').value.trim();
   const sender = document.getElementById('senderName').value.trim();
+  const status1 = document.querySelector('.status1-checkbox:checked')?.value || '';
+  const status2 = document.querySelector('.status2-checkbox:checked')?.value || '';
 
   if (!name || !address || !phone || !sender) {
     alert("Please fill all required fields!");
+    return;
+  }
+
+  if (status1 === "Rejected" && capturedBlobs.length > 1) {
+    alert("Rejected parcels can only be captured one at a time.");
     return;
   }
 
@@ -424,11 +463,25 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
       capturerId: user.userId,
       capturerName: user.name,
       role: user.role,
+      status1, status2,
       photoCount: uploadedUrls.length,
       photos: uploadedUrls,
       timestamp: serverTimestamp()
     };
 
+    if (status1 === "Rejected") {
+      const feeRaw = document.getElementById("rejectionFee").value;
+      if (!feeRaw) {
+        alert("Please enter rejection fee");
+        submitBtn.disabled = false;
+        submitBtn.textContent = prevText;
+        return;
+      }
+      payload.rejectionFee = parseFloat(feeRaw);
+    }
+
+    await addDoc(collection(db, "parcels"), payload);
+    // Also save to history collection
     await addDoc(collection(db, "parcels"), payload);
 
     submitBtn.textContent = "Saved ✓";
@@ -442,6 +495,107 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     document.getElementById('parcelAddress').value = '';
     document.getElementById('parcelPhone').value = '';
     document.getElementById('senderName').value = '';
+    document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('rejectionFeeWrap').classList.add('hidden');
+    document.getElementById("rejectionFee").value = "";
+    thumbs.innerHTML = '';
+    capturedBlobs = [];
+
+
+
+
+
+    submitBtn.textContent = "Saved ✓";
+    setTimeout(() => {
+      submitBtn.textContent = prevText;
+      submitBtn.disabled = false;
+    }, 800);
+
+
+    // ===== Load user history =====
+async function loadHistory(showAll = false) {
+  const latestBox = document.getElementById("latestHistory");
+  const list = document.getElementById("historyList");
+
+  latestBox.innerHTML = "<p class='text-gray-500'>Loading...</p>";
+  if (showAll) {
+    list.innerHTML = "<p class='text-gray-500'>Loading...</p>";
+  }
+
+  const q = query(
+    collection(db, "parcels"),
+    where("capturerId", "==", user.userId),
+    orderBy("timestamp", "desc")
+  );
+
+  const snap = await getDocs(q);
+  if (snap.empty) {
+    latestBox.innerHTML = "<p class='text-gray-500'>No submissions yet.</p>";
+    list.innerHTML = "";
+    return;
+  }
+
+  // latest submission
+  const first = snap.docs[0].data();
+  latestBox.innerHTML = renderHistoryItem(first);
+
+  // full list
+  if (showAll) {
+    list.innerHTML = "";
+    snap.forEach(doc => {
+      const data = doc.data();
+      const div = document.createElement("div");
+      div.innerHTML = renderHistoryItem(data);
+      list.appendChild(div);
+    });
+  }
+}
+
+// ===== Render a single history card =====
+function renderHistoryItem(data) {
+  return `
+    <div class="border rounded p-2">
+      <p><strong>${data.name}</strong> (${data.phone})</p>
+      <p>Status: ${data.status1 || "-"} ${data.status2 || ""}</p>
+      ${data.rejectionFee ? `<p>Rejection Fee: GHS ${data.rejectionFee}</p>` : ""}
+      <div class="flex gap-2 mt-2 flex-wrap">
+        ${(data.photos || []).map(url => `<img src="${url}" class="w-16 h-16 object-cover rounded">`).join("")}
+      </div>
+      <p class="text-xs text-gray-500 mt-1">
+        ${data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : ""}
+      </p>
+    </div>
+  `;
+}
+
+// ===== Toggle history =====
+document.getElementById("toggleHistory").addEventListener("click", () => {
+  const list = document.getElementById("historyList");
+  const btn = document.getElementById("toggleHistory");
+  const showAll = list.classList.contains("hidden");
+
+  if (showAll) {
+    list.classList.remove("hidden");
+    btn.textContent = "Hide";
+    loadHistory(true);
+  } else {
+    list.classList.add("hidden");
+    btn.textContent = "Show All";
+  }
+});
+
+// load on page start
+loadHistory();
+
+
+    // reset form
+    document.getElementById('parcelName').value = '';
+    document.getElementById('parcelAddress').value = '';
+    document.getElementById('parcelPhone').value = '';
+    document.getElementById('senderName').value = '';
+    document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('rejectionFeeWrap').classList.add('hidden');
+    document.getElementById("rejectionFee").value = "";
     thumbs.innerHTML = '';
     capturedBlobs = [];
   } catch (err) {
@@ -452,7 +606,6 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   }
 });
 </script>
-
 
 <!-- <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script> -->
 
