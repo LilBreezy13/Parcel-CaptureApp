@@ -732,7 +732,12 @@ map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
         </div>
       `;
       root.querySelector('.view-btn').addEventListener('click', ()=>{
-        const photos = (d.photos||[]).map(u=>`<img src="${esc(u)}" class="w-48 h-28 object-cover rounded mr-2">`).join('') || '<div class="text-xs muted">No images</div>';
+    const photos = (d.photos||[]).map(u =>
+  `<img src="${esc(u)}" class="parcel-thumb w-48 h-28 object-cover rounded mr-2 cursor-pointer">`
+).join('') || '<div class="text-xs muted">No images</div>';
+
+
+        
         openModal(`
           <div class="mb-3 flex gap-2 overflow-x-auto">${photos}</div>
           <p><b>Name:</b> ${esc(d.name||'')}</p>
@@ -1196,5 +1201,11 @@ db.collection('parcels').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
 
 
   </script>
+
+<!-- Full Image Modal -->
+<div id="imageModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center hidden z-50">
+  <img id="imageModalContent" src="" class="max-h-[90%] max-w-[90%] rounded shadow-lg">
+</div>
+
 </body>
 </html>

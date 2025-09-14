@@ -173,7 +173,11 @@
     <!-- Submit -->
     <section>
       <div class="flex flex-col sm:flex-row gap-2">
-        <button id="submitBtn" class="w-full sm:flex-1 px-6 py-2 bg-green-600 text-white rounded-lg text-sm sm:text-base font-semibold shadow hover:bg-green-700 transition">Submit</button>
+       <button id="submitBtn" type="button"
+  class="w-full sm:flex-1 px-6 py-2 bg-green-600 text-white rounded-lg text-sm sm:text-base font-semibold shadow hover:bg-green-700 transition">
+  Submit
+</button>
+
       </div>
     </section>
 
@@ -217,16 +221,12 @@
 
 
 
-  <!-- Scripts -->
-   
-   
-   <script type="module">
+  <!-- Scripts --><script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, serverTimestamp
+  getFirestore, collection, addDoc, serverTimestamp,
+  query, where, getDocs, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
 import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
@@ -257,6 +257,11 @@ if (!user || !user.userId) {
   document.getElementById("mobileUserInfo").textContent =
     `Parcel Capture ${user.name} (${user.userId}) - ${user.role}`;
 }
+
+// prevent form default submits
+document.querySelectorAll("form").forEach(f => {
+  f.addEventListener("submit", e => e.preventDefault());
+});
 
 // ===== Sign out =====
 document.getElementById("signOutBtn").addEventListener("click", () => {
@@ -422,24 +427,66 @@ document.querySelectorAll('.status1-checkbox').forEach(cb => {
   });
 });
 
+// ===== Load user history =====
+async function loadHistory(showAll = false) {
+  const latestBox = document.getElementById("latestHistory");
+  const list = document.getElementById("historyList");
+
+  latestBox.innerHTML = "<p class='text-gray-500'>Loading...</p>";
+  if (showAll) list.innerHTML = "<p class='text-gray-500'>Loading...</p>";
+
+  const q = query(
+    collection(db, "parcels"),
+    where("capturerId", "==", user.userId),
+    orderBy("timestamp", "desc")
+  );
+
+  const snap = await getDocs(q);
+  if (snap.empty) {
+    latestBox.innerHTML = "<p class='text-gray-500'>No submissions yet.</p>";
+    list.innerHTML = "";
+    return;
+  }
+
+  const first = snap.docs[0].data();
+  latestBox.innerHTML = renderHistoryItem(first);
+
+  if (showAll) {
+    list.innerHTML = "";
+    snap.forEach(doc => {
+      const data = doc.data();
+      const div = document.createElement("div");
+      div.innerHTML = renderHistoryItem(data);
+      list.appendChild(div);
+    });
+  }
+}
+
+function renderHistoryItem(data) {
+  return `
+    <div class="border rounded p-2">
+      <p><strong>${data.name}</strong> (${data.phone})</p>
+      <p>Address: ${data.address || "-"}</p>
+      <p>Sent by: ${data.sender || "-"}</p>
+      <p>Status: ${data.status1 || "-"} ${data.status2 || ""}</p>
+      ${data.rejectionFee ? `<p>Rejection Fee: GHS ${data.rejectionFee}</p>` : ""}
+      <div class="flex gap-2 mt-2 flex-wrap">
+        ${(data.photos || []).map(url => `<img src="${url}" class="w-16 h-16 object-cover rounded">`).join("")}
+      </div>
+      <p class="text-xs text-gray-500 mt-1">
+        ${data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : ""}
+      </p>
+    </div>
+  `;
+}
+
+
+
 // ===== Submit handler =====
+let isSubmitting = false;
 document.getElementById('submitBtn').addEventListener('click', async () => {
-  const name = document.getElementById('parcelName').value.trim();
-  const address = document.getElementById('parcelAddress').value.trim();
-  const phone = document.getElementById('parcelPhone').value.trim();
-  const sender = document.getElementById('senderName').value.trim();
-  const status1 = document.querySelector('.status1-checkbox:checked')?.value || '';
-  const status2 = document.querySelector('.status2-checkbox:checked')?.value || '';
-
-  if (!name || !address || !phone || !sender) {
-    alert("Please fill all required fields!");
-    return;
-  }
-
-  if (status1 === "Rejected" && capturedBlobs.length > 1) {
-    alert("Rejected parcels can only be captured one at a time.");
-    return;
-  }
+  if (isSubmitting) return;
+  isSubmitting = true;
 
   const submitBtn = document.getElementById("submitBtn");
   const prevText = submitBtn.textContent;
@@ -447,6 +494,22 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   submitBtn.textContent = "Saving...";
 
   try {
+    const name = document.getElementById('parcelName').value.trim();
+    const address = document.getElementById('parcelAddress').value.trim();
+    const phone = document.getElementById('parcelPhone').value.trim();
+    const sender = document.getElementById('senderName').value.trim();
+    const status1 = document.querySelector('.status1-checkbox:checked')?.value || '';
+    const status2 = document.querySelector('.status2-checkbox:checked')?.value || '';
+
+    if (!name || !address || !phone || !sender) {
+      alert("Please fill all required fields!");
+      return;
+    }
+    if (status1 === "Rejected" && capturedBlobs.length > 1) {
+      alert("Rejected parcels can only be captured one at a time.");
+      return;
+    }
+
     const uploadedUrls = [];
     for (let i = 0; i < capturedBlobs.length; i++) {
       const item = capturedBlobs[i];
@@ -473,24 +536,16 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
       const feeRaw = document.getElementById("rejectionFee").value;
       if (!feeRaw) {
         alert("Please enter rejection fee");
-        submitBtn.disabled = false;
-        submitBtn.textContent = prevText;
         return;
       }
       payload.rejectionFee = parseFloat(feeRaw);
     }
 
     await addDoc(collection(db, "parcels"), payload);
-    // Also save to history collection
-    await addDoc(collection(db, "parcels"), payload);
 
     submitBtn.textContent = "Saved ✓";
-    setTimeout(() => {
-      submitBtn.textContent = prevText;
-      submitBtn.disabled = false;
-    }, 800);
+    setTimeout(() => { submitBtn.textContent = prevText; submitBtn.disabled = false; }, 1000);
 
-    // reset form
     document.getElementById('parcelName').value = '';
     document.getElementById('parcelAddress').value = '';
     document.getElementById('parcelPhone').value = '';
@@ -501,72 +556,18 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     thumbs.innerHTML = '';
     capturedBlobs = [];
 
+    await loadHistory();
 
-
-
-
-    submitBtn.textContent = "Saved ✓";
-    setTimeout(() => {
-      submitBtn.textContent = prevText;
-      submitBtn.disabled = false;
-    }, 800);
-
-
-    // ===== Load user history =====
-async function loadHistory(showAll = false) {
-  const latestBox = document.getElementById("latestHistory");
-  const list = document.getElementById("historyList");
-
-  latestBox.innerHTML = "<p class='text-gray-500'>Loading...</p>";
-  if (showAll) {
-    list.innerHTML = "<p class='text-gray-500'>Loading...</p>";
-  }
-
-  const q = query(
-    collection(db, "parcels"),
-    where("capturerId", "==", user.userId),
-    orderBy("timestamp", "desc")
-  );
-
-  const snap = await getDocs(q);
-  if (snap.empty) {
-    latestBox.innerHTML = "<p class='text-gray-500'>No submissions yet.</p>";
-    list.innerHTML = "";
-    return;
-  }
-
-  // latest submission
-  const first = snap.docs[0].data();
-  latestBox.innerHTML = renderHistoryItem(first);
-
-  // full list
-  if (showAll) {
-    list.innerHTML = "";
-    snap.forEach(doc => {
-      const data = doc.data();
-      const div = document.createElement("div");
-      div.innerHTML = renderHistoryItem(data);
-      list.appendChild(div);
-    });
-  }
+} catch (err) {
+  console.error("❌ Save failed:", err.code, err.message, err);
+  alert("Failed to save. Check console for details.");
+  submitBtn.disabled = false;
+  submitBtn.textContent = prevText;
+} finally {
+  isSubmitting = false;
 }
 
-// ===== Render a single history card =====
-function renderHistoryItem(data) {
-  return `
-    <div class="border rounded p-2">
-      <p><strong>${data.name}</strong> (${data.phone})</p>
-      <p>Status: ${data.status1 || "-"} ${data.status2 || ""}</p>
-      ${data.rejectionFee ? `<p>Rejection Fee: GHS ${data.rejectionFee}</p>` : ""}
-      <div class="flex gap-2 mt-2 flex-wrap">
-        ${(data.photos || []).map(url => `<img src="${url}" class="w-16 h-16 object-cover rounded">`).join("")}
-      </div>
-      <p class="text-xs text-gray-500 mt-1">
-        ${data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : ""}
-      </p>
-    </div>
-  `;
-}
+});
 
 // ===== Toggle history =====
 document.getElementById("toggleHistory").addEventListener("click", () => {
@@ -583,29 +584,43 @@ document.getElementById("toggleHistory").addEventListener("click", () => {
     btn.textContent = "Show All";
   }
 });
-
-// load on page start
 loadHistory();
 
+// ===== Officer PIN modal =====
+const officerBtn = document.getElementById("officerBtn");
+const pinModal   = document.getElementById("pinModal");
+const cancelPinBtn = document.getElementById("cancelPinBtn");
+const submitPinBtn = document.getElementById("submitPinBtn");
+const officerPinInput = document.getElementById("officerPinInput");
+const pinError   = document.getElementById("pinError");
+const OFFICER_PIN = "123456"; // replace with real PIN
 
-    // reset form
-    document.getElementById('parcelName').value = '';
-    document.getElementById('parcelAddress').value = '';
-    document.getElementById('parcelPhone').value = '';
-    document.getElementById('senderName').value = '';
-    document.querySelectorAll('.status1-checkbox, .status2-checkbox').forEach(cb => cb.checked = false);
-    document.getElementById('rejectionFeeWrap').classList.add('hidden');
-    document.getElementById("rejectionFee").value = "";
-    thumbs.innerHTML = '';
-    capturedBlobs = [];
-  } catch (err) {
-    console.error("Save failed", err);
-    alert("Failed to save. Try again.");
-    submitBtn.disabled = false;
-    submitBtn.textContent = prevText;
-  }
-});
+if (officerBtn) {
+  officerBtn.addEventListener("click", e => {
+    e.preventDefault();
+    pinModal.classList.remove("hidden");
+    officerPinInput.value = "";
+    pinError.classList.add("hidden");
+    officerPinInput.focus();
+  });
+}
+if (cancelPinBtn) cancelPinBtn.addEventListener("click", () => pinModal.classList.add("hidden"));
+if (submitPinBtn) {
+  submitPinBtn.addEventListener("click", () => {
+    if (officerPinInput.value === OFFICER_PIN) {
+      window.location.href = "officer.html";
+    } else {
+      pinError.classList.remove("hidden");
+    }
+  });
+}
+if (officerPinInput) {
+  officerPinInput.addEventListener("keyup", e => {
+    if (e.key === "Enter") submitPinBtn.click();
+  });
+}
 </script>
+
 
 <!-- <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script> -->
 
