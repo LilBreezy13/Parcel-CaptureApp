@@ -113,6 +113,22 @@ html.light aside {
   box-shadow: none; /* remove shadow if any */
 }
 
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE/Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+.tab-btn {
+  @apply px-3 py-1 rounded bg-white/5 text-sm;
+}
+.tab-btn.active {
+  @apply bg-blue-600 text-white;
+}
+
     
   </style>
 
@@ -307,7 +323,8 @@ html.light aside {
         </div>
 
         <div class="p-4 rounded-xl glass">
-          <div id="parcelsTabs" class="flex gap-2 mb-4"></div>
+        <div id="parcelsTabs" class="flex gap-2 mb-4 overflow-x-auto no-scrollbar whitespace-nowrap"></div>
+
           <div id="parcelsSheets" class="space-y-3"></div>
         </div>
       </section>
@@ -344,6 +361,7 @@ html.light aside {
     <th class="border border-white/10 p-2">Address</th>
     <th class="border border-white/10 p-2">Status 02</th>
     <th class="border border-white/10 p-2">Status 01</th>
+    
     <!-- <th class="border border-white/10 p-2">Paid</th>
     <th class="border border-white/10 p-2">Part Payment</th>
     <th class="border border-white/10 p-2">Not Paid</th> -->
@@ -417,6 +435,13 @@ html.light aside {
   </div>
 
 <audio id="notifSound" src="/sound/17571.mp3" preload="auto"></audio>
+
+
+
+
+
+
+
 
 
 
@@ -498,29 +523,43 @@ async function loadStatistics(mode = 'daily') {
 function exportStatsExcel() {
   const section = (label, obj) => {
     const arr = Object.entries(obj).sort((a, b) => b[1] - a[1]);
-    let html = `<tr><th colspan="3" style="text-align:left">${label}</th></tr>
-                <tr><th>Rank</th><th>Officer</th><th>Count</th></tr>`;
+    let html = `
+      <tr><th colspan="3" style="background:#2563eb;color:#fff;font-weight:bold;text-align:left;padding:8px;">${label}</th></tr>
+      <tr><th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Rank</th>
+          <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Officer</th>
+          <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Count</th></tr>`;
     if (!arr.length) {
-      html += `<tr><td colspan="3">No data</td></tr>`;
+      html += `<tr><td colspan="3" style="padding:8px;">No data</td></tr>`;
     } else {
       arr.forEach(([name, count], i) => {
-        html += `<tr><td>${i + 1}</td><td>${name}</td><td>${count}</td></tr>`;
+        html += `<tr>
+          <td style="padding:8px;border:1px solid #999;">${i + 1}</td>
+          <td style="padding:8px;border:1px solid #999;">${name}</td>
+          <td style="padding:8px;border:1px solid #999;">${count}</td>
+        </tr>`;
       });
     }
     return html;
   };
 
-  const tableHtml = `<table>
+  const tableHtml = `<table style="border-collapse:collapse;font-family:Arial;">
     ${section('Shortages',  lastStatsCounts.shortages)}
     ${section('Rejected',   lastStatsCounts.rejected)}
     ${section('New Schools',lastStatsCounts.new)}
   </table>`;
 
-  const link = document.createElement('a');
-  link.href = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(tableHtml);
-  link.download = `Statistics_${new Date().toISOString().split('T')[0]}.xls`;
-  link.click();
+  const blob = new Blob([tableHtml], { type: "application/vnd.ms-excel" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Statistics_${new Date().toISOString().split('T')[0]}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
+
 
 // Wire up events + initial load
 document.addEventListener('DOMContentLoaded', () => {
@@ -738,14 +777,24 @@ map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
 
 
         
+ // Check if parcel is rejected
+  const isRejected = String(d.status1 || '').toLowerCase().includes('rejected') ||
+                     String(d.status2 || '').toLowerCase().includes('rejected');
+
+  // Format rejection fee if rejected
+  const rejectionFeeHtml = isRejected
+    ? `<p><b>Rejection Fee:</b> &#8373;${Number(d.rejectionFee || 0).toLocaleString('en-GH', { minimumFractionDigits: 2 })}</p>`
+    : '';
+
+
         openModal(`
           <div class="mb-3 flex gap-2 overflow-x-auto">${photos}</div>
-          <p><b>Name:</b> ${esc(d.name||'')}</p>
+          <p><b>Parcel Name:</b> ${esc(d.name||'')}</p>
           <p><b>Address:</b> ${esc(d.address||'')}</p>
           <p><b>Phone:</b> ${esc(d.phone||'')}</p>
           <p><b>Captured by:</b> ${esc(d.capturerName || '')} (${esc(d.capturerId || '')}, ${esc(d.role || '')})</p>
 <p><b>Parcel Sent By:</b> ${esc(d.sender || '')}</p>
-
+${rejectionFeeHtml}
 
 
           <div class="mt-2">${badgesHtml(d.status1, d.status2)}</div>
@@ -973,44 +1022,80 @@ document.getElementById('notifSound').play().catch(err => {
       
     }); // end onSnapshot
     
-    // CSV Export
-    document.getElementById('exportCsv').addEventListener('click', async ()=>{
-      const snap = await getDocs(collection(db,'parcels'));
-   const rows = [['id','name','address','phone','capturerId','capturerName','role','sender','status1','status2','rejectionFee','photoCount','timestamp','lat','lng','region']];
+   // ===== Enhanced Export for Parcels (Excel table styled) =====
+async function exportCsv() {
+  try {
+    const snap = await getDocs(collection(db, 'parcels'));
+    let rows = `
+      <tr>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Parcel Id</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Name</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Address</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Phone</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Captured By</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Sender</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Parcel Status</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Payment Status</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Rejected Amount &#8373;</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Photos</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Date</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Lat</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Lng</th>
+        <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;text-transform:capitalize;">Region</th>
+      </tr>`;
 
+    let i = 0;
+    snap.forEach(doc => {
+      const d = doc.data();
+      const esc = v => String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 
+      // Format rejected amount as Ghana Cedis (₵)
+      const rejectedAmount = d.rejectionFee
+        ? `&#8373;${Number(d.rejectionFee).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
+        : '&#8373;0.00';
 
-      snap.forEach(doc=>{
-        const d = doc.data();
-       rows.push([
-  doc.id,
-  d.name || '',
-  d.address || '',
-  d.phone || '',
-  d.capturerId || '',
-  d.capturerName || '',
-  d.role || '',
-  d.sender || '',
-  d.status1 || '',
-  d.status2 || '',
-   d.rejectionFee || 0, 
-  Array.isArray(d.photos) ? d.photos.length : (d.photoCount ?? 0),
-  formatTimestamp(d.timestamp),
-  d.lat ?? '',
-  d.lng ?? '',
-  d.region ?? d.state ?? d.country ?? ''
-]);
-
-      });
-      const csv = rows.map(r=> r.map(c=> `"${String(c).replaceAll('"','""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type:'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `parcels_export_${Date.now()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      rows += `<tr style="background:${i % 2 === 0 ? '#f9fafb' : '#ffffff'};">
+        <td style="padding:8px;border:1px solid #ccc;">${esc(doc.id)}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.name || d.school || '')}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.address || '')}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.phone || d.contact || '')}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.capturerName || '')}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.sender || '')}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.status1 || '')}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.status2 || '')}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${rejectedAmount}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(Array.isArray(d.photos) ? d.photos.length : (d.photoCount ?? 0))}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(formatTimestamp(d.timestamp))}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.lat || '')}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.lng || '')}</td>
+        <td style="padding:8px;border:1px solid #ccc;">${esc(d.region || d.state || d.country || '')}</td>
+      </tr>`;
+      i++;
     });
+
+    const html = `<table style="border-collapse:collapse;font-family:Arial, sans-serif;font-size:13px;">${rows}</table>`;
+    const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Latest_Parcels_${new Date().toISOString().split("T")[0]}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Export failed', err);
+    alert('Export failed. Check console for details.');
+  }
+}
+
+// reattach the button listener (keeps behavior safe)
+const _exportCsvBtn = document.getElementById('exportCsv');
+if (_exportCsvBtn) {
+  try { _exportCsvBtn.removeEventListener('click', exportCsv); } catch(e){}
+  _exportCsvBtn.addEventListener('click', exportCsv);
+}
+
 
     // Search & Status filter (client-side)
     searchInput.addEventListener('input', ()=>{
@@ -1111,21 +1196,62 @@ reportsTableBody.innerHTML = rows.length
     }
   }
 
-  function exportTable(format) {
-    let table = document.getElementById('reportsTable');
-    if (!table) return;
+function exportTable(format) {
+  const reportsTableBody = document.getElementById('reportsTableBody');
+  if (!reportsTableBody) return;
 
-    let html = table.outerHTML.replace(/ /g, '%20');
-    let filename = `Reports_${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xls' : 'doc'}`;
-    let mime = format === 'excel'
-      ? 'application/vnd.ms-excel'
-      : 'application/msword';
+  let rows = `
+    <tr>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Parcel ID</th>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Captured By</th>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Parcel Sent By</th>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Name</th>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Contact</th>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Address</th>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Payment Status</th>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Parcel Status</th>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Rejected Amount &#8373;</th>
+      <th style="background:#2563eb;color:#fff;font-weight:bold;padding:8px;">Date</th>
+    </tr>`;
 
-    let link = document.createElement('a');
-    link.href = 'data:' + mime + ';charset=utf-8,' + html;
-    link.download = filename;
-    link.click();
-  }
+  let i = 0;
+  [...reportsTableBody.querySelectorAll("tr")].forEach(tr => {
+    const cells = [...tr.children].map(td => td.innerText.trim());
+    if (cells.length < 10 || cells[0].includes("No records")) return;
+
+   // format rejected amount as cedis
+const rejectedAmount = cells[8] && !isNaN(cells[8])
+  ? `&#8373;${Number(cells[8]).toLocaleString('en-GH', { minimumFractionDigits: 2 })}`
+  : '&#8373;0.00';
+
+
+    rows += `<tr style="background:${i % 2 === 0 ? '#f9fafb' : '#ffffff'};">
+      <td style="padding:8px;border:1px solid #ccc;">${cells[0]}</td>
+      <td style="padding:8px;border:1px solid #ccc;">${cells[1]}</td>
+      <td style="padding:8px;border:1px solid #ccc;">${cells[2]}</td>
+      <td style="padding:8px;border:1px solid #ccc;">${cells[3]}</td>
+      <td style="padding:8px;border:1px solid #ccc;">${cells[4]}</td>
+      <td style="padding:8px;border:1px solid #ccc;">${cells[5]}</td>
+      <td style="padding:8px;border:1px solid #ccc;">${cells[6]}</td>
+      <td style="padding:8px;border:1px solid #ccc;">${cells[7]}</td>
+      <td style="padding:8px;border:1px solid #ccc;">${rejectedAmount}</td>
+      <td style="padding:8px;border:1px solid #ccc;">${cells[9]}</td>
+    </tr>`;
+    i++;
+  });
+
+  const html = `<table style="border-collapse:collapse;font-family:Arial, sans-serif;font-size:13px;">${rows}</table>`;
+  const blob = new Blob([html], { type: format === 'excel' ? "application/vnd.ms-excel" : "application/msword" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Reports_${new Date().toISOString().split("T")[0]}.${format === 'excel' ? 'xls' : 'doc'}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
   reportFilter.addEventListener('change', () => loadReports(reportFilter.value));
   exportExcelBtn.addEventListener('click', () => exportTable('excel'));
