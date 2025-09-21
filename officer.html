@@ -775,6 +775,17 @@ map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
   `<img src="${esc(u)}" class="parcel-thumb w-48 h-28 object-cover rounded mr-2 cursor-pointer">`
 ).join('') || '<div class="text-xs muted">No images</div>';
 
+// Make thumbnails clickable to open in full mode
+setTimeout(() => {
+  document.querySelectorAll('.parcel-thumb').forEach(img => {
+    img.addEventListener('click', () => {
+      const modal = document.getElementById('imageModal');
+      const modalImg = document.getElementById('imageModalContent');
+      modalImg.src = img.src;
+      modal.classList.remove('hidden');
+    });
+  });
+}, 50);
 
         
  // Check if parcel is rejected
@@ -1326,12 +1337,47 @@ db.collection('parcels').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
 
 
 
+
+
+
+// Refresh Reports when Reports tab is clicked
+document.addEventListener('DOMContentLoaded', () => {
+  const reportsTab = document.querySelector('button[data-page="reports"]');
+  if (reportsTab) {
+    reportsTab.addEventListener('click', () => {
+      loadReports(); // fetch and rebuild reports
+      console.log("Reports refreshed on tab click");
+    });
+  }
+});
+
+
+// Refresh Statistics when Statistics tab is clicked
+document.addEventListener('DOMContentLoaded', () => {
+  const statsTab = document.querySelector('button[data-page="statistics"]');
+  if (statsTab) {
+    statsTab.addEventListener('click', () => {
+      if (typeof loadStatistics === 'function') {
+        loadStatistics(); // fetch and rebuild statistics
+        console.log("Statistics refreshed on tab click");
+      }
+    });
+  }
+});
+
+
   </script>
 
-<!-- Full Image Modal -->
-<div id="imageModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center hidden z-50">
+<div id="imageModal" class="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center hidden z-50">
+  <button id="closeImageModal" class="mb-4 px-4 py-2 bg-red-600 text-white rounded">Close</button>
   <img id="imageModalContent" src="" class="max-h-[90%] max-w-[90%] rounded shadow-lg">
 </div>
+
+<script>
+  document.getElementById('closeImageModal').onclick = function () {
+    document.getElementById('imageModal').classList.add('hidden');
+  };
+</script>
 
 </body>
 </html>
