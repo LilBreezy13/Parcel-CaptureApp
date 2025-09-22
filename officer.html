@@ -722,31 +722,29 @@ map.on('drag', () => { map.panInsideBounds(ghanaBounds, { animate: false }); });
     }
     function esc(s){ return s==null?'':String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
 
-    function badgesHtml(s1, s2) {
-      const a = [];
-      const s1l = String(s1||'').toLowerCase();
-      const s2l = String(s2||'').toLowerCase();
-      if (s1) {
-        if (s1l.includes('rejected')) a.push(`<span class="status-badge badge-rejected">Rejected</span>`);
-        else if (s1l.includes('short')) a.push(`<span class="status-badge badge-short">Shortages</span>`);
-        else if (s1l.includes('new')) a.push(`<span class="status-badge badge-new">New School</span>`);
-        else if (s1l.includes('part')) a.push(`<span class="status-badge badge-part">Part Payment</span>`);
-        else if (s1l.includes('paid') && !s1l.includes('part')) a.push(`<span class="status-badge badge-paid">Paid</span>`);
-        else if (s1l.includes('not paid')) a.push(`<span class="status-badge badge-not">Not Paid</span>`);
-        else a.push(`<span class="status-badge badge-not">${esc(s1)}</span>`);
-      }
-      if (s2) {
-        if (s2l.includes('rejected')) a.push(`<span class="status-badge badge-rejected">Rejected</span>`);
-        else if (s2l.includes('short')) a.push(`<span class="status-badge badge-short">Shortages</span>`);
-        else if (s2l.includes('new')) a.push(`<span class="status-badge badge-new">New School</span>`);
-        else if (s2l.includes('part')) a.push(`<span class="status-badge badge-part">Part Payment</span>`);
-        else if (s2l.includes('paid') && !s2l.includes('part')) a.push(`<span class="status-badge badge-paid">Paid</span>`);
-        else if (s2l.includes('not paid')) a.push(`<span class="status-badge badge-not">Not Paid</span>`);
-        else a.push(`<span class="status-badge badge-not">${esc(s2)}</span>`);
-      }
-      if (!s1 && !s2) a.push(`<span class="status-badge badge-not">Pending</span>`);
-      return a.join('');
+   function badgesHtml(s1, s2) {
+  const a = [];
+  const s1l = String(s1||'').toLowerCase();
+  const s2l = String(s2||'').toLowerCase();
+
+  const addBadge = (val) => {
+    switch(val) {
+      case 'rejected':      return `<span class="status-badge badge-rejected">Rejected</span>`;
+      case 'shortages':     return `<span class="status-badge badge-short">Shortages</span>`;
+      case 'new school':    return `<span class="status-badge badge-new">New School</span>`;
+      case 'part payment':  return `<span class="status-badge badge-part">Part Payment</span>`;
+      case 'paid':          return `<span class="status-badge badge-paid">Paid</span>`;
+      case 'not paid':      return `<span class="status-badge badge-not">Not Paid</span>`;
+      default:              return `<span class="status-badge badge-not">${esc(val)}</span>`;
     }
+  };
+
+  if (s1l) a.push(addBadge(s1l));
+  if (s2l) a.push(addBadge(s2l));
+  if (!s1l && !s2l) a.push(`<span class="status-badge badge-not">Pending</span>`);
+
+  return a.join('');
+}
 
     // create parcel card element (used both in latest box and parcels page)
     function makeParcelCard(d){
@@ -859,14 +857,17 @@ ${rejectionFeeHtml}
         const ts = d.timestamp?.seconds ? new Date(d.timestamp.seconds*1000) : new Date();
         if (ts >= startToday) today++; else if (ts >= startYesterday) yesterday++; else older++;
 
-        const s1 = String(d.status1||'').toLowerCase();
-        const s2 = String(d.status2||'').toLowerCase();
-        if (s1.includes('rejected') || s2.includes('rejected')) rejected++;
-        if (s1.includes('short') || s2.includes('short')) shortages++;
-        if (s1.includes('new') || s2.includes('new')) newSchool++;
-        if ((s1.includes('paid') && !s1.includes('part')) || (s2.includes('paid') && !s2.includes('part'))) paid++;
-        if (s1.includes('part') || s2.includes('part')) part++;
-        if (s1.includes('not paid') || s2.includes('not paid')) notPaid++;
+       const s1 = String(d.status1||'').toLowerCase();
+const s2 = String(d.status2||'').toLowerCase();
+
+// ✅ Exact matches only
+if (s1 === 'rejected' || s2 === 'rejected') rejected++;
+if (s1 === 'shortages' || s2 === 'shortages') shortages++;
+if (s1 === 'new school' || s2 === 'new school') newSchool++;
+if (s1 === 'paid' || s2 === 'paid') paid++;
+if (s1 === 'part payment' || s2 === 'part payment') part++;
+if (s1 === 'not paid' || s2 === 'not paid') notPaid++;
+
 
         // latest list card
         latestList.appendChild(makeParcelCard(d));
