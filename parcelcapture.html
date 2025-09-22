@@ -517,10 +517,14 @@ if (!/^0\d{9}$/.test(phone)) {
 }
 
 
-    if (!name || !address || !phone || !sender) {
-      alert("Please fill all required fields!");
-      return;
-    }
+  if (!name || !address || !phone || !sender) {
+  alert("Please fill all required fields!");
+  submitBtn.disabled = false;
+  submitBtn.textContent = prevText;
+  isSubmitting = false;
+  return;
+}
+
     if (status1 === "Rejected" && capturedBlobs.length > 1) {
       alert("Rejected parcels can only be captured one at a time.");
       return;
@@ -548,14 +552,18 @@ if (!/^0\d{9}$/.test(phone)) {
       timestamp: serverTimestamp()
     };
 
-    if (status1 === "Rejected") {
-      const feeRaw = document.getElementById("rejectionFee").value;
-      if (!feeRaw) {
-        alert("Please enter rejection fee");
-        return;
-      }
-      payload.rejectionFee = parseFloat(feeRaw);
-    }
+  if (status1 === "Rejected") {
+  const feeRaw = document.getElementById("rejectionFee").value;
+  if (!feeRaw) {
+    alert("Please enter rejection fee");
+    submitBtn.disabled = false;
+    submitBtn.textContent = prevText;
+    isSubmitting = false;
+    return;
+  }
+  payload.rejectionFee = parseFloat(feeRaw);
+}
+
 
     await addDoc(collection(db, "parcels"), payload);
 
